@@ -9,7 +9,7 @@ class Tb:
 
         # Register this class so we get notified of
         # events, like pen presses.
-        hardware.registerCallbackHandler(self)
+        hardware.display.registerCallbackHandler(self)
 
         self.hardware = hardware
         self.bg = bg
@@ -18,7 +18,7 @@ class Tb:
         self.start = (x, y)
 
     def onDragPoint(self, x, y):
-        self.hardware.setPixel(x, y, 1 - self.bg)
+        self.hardware.display.setPixel(x, y, 1 - self.bg)
 
     def onDragStop(self, x, y):
         print("Lifted the pen at", (x, y))

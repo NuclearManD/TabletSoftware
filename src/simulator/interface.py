@@ -2,7 +2,7 @@
 import tkinter as tk
 import time, _thread
 
-class TabletHardware:
+class TabletEPaperDisplay:
     def __init__(self, screen_res = (800, 480), scale = 2):
         if type(scale) != int:
             raise ValueError("scale parameter must be an integer")
@@ -13,8 +13,6 @@ class TabletHardware:
         self._canvas_width = screen_res[0] * scale
         self._canvas_height = screen_res[1] * scale
         self._was_dragging = False
-
-        self.start_time = time.time()
 
         _thread.start_new_thread(self.mainloop, ())
 
@@ -89,6 +87,11 @@ class TabletHardware:
             else:
                 self.handler.onDragPoint(x, y)
 
+class TabletHardware:
+    def __init__(self):
+        self.display = TabletEPaperDisplay()
+        self.start_time = time.time()
+
     def getBatteryVoltage(self):
         x = (time.time() - self.start_time) / 1000
 
@@ -106,3 +109,8 @@ class TabletHardware:
 
         return round(y, 4)
 
+    def setVibrate(self, isOn):
+        # We ignore this because the simulator cannot vibrate.
+        # This function needs to be here so simulation of real
+        # programs is possible, however
+        pass
