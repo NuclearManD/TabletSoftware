@@ -14,6 +14,8 @@ class TabletHardware:
         self._canvas_height = screen_res[1] * scale
         self._was_dragging = False
 
+        self.start_time = time.time()
+
         _thread.start_new_thread(self.mainloop, ())
 
     def mainloop(self):
@@ -86,4 +88,14 @@ class TabletHardware:
                 self._was_dragging = True
             else:
                 self.handler.onDragPoint(x, y)
+
+    def getBatteryVoltage(self):
+        x = (time.time() - self.start_time) / 1000
+
+        # This battery curve simulates a lithium battery completely discharging over
+        # an hour of use.  Don't worry, I did the math and the real battery will last
+        # longer than that!
+        y = 0.0107*(x**4) - .16*(x**3) + .63*(x**2) - .96*x + 4.2
+
+        return round(y, 4)
 
