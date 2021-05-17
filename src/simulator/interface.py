@@ -92,6 +92,13 @@ class TabletHardware:
     def getBatteryVoltage(self):
         x = (time.time() - self.start_time) / 1000
 
+        if x > 3.6:
+            # It's been over an hour.  Pretend the battery magically refilled.
+            # x is in kiloseconds (ik weird unit, makes the polynomial easier), and
+            # 3.6 kiloseconds is one hour
+            x = 0
+            self.start_time = time.time()
+
         # This battery curve simulates a lithium battery completely discharging over
         # an hour of use.  Don't worry, I did the math and the real battery will last
         # longer than that!
