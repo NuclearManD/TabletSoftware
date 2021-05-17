@@ -77,6 +77,12 @@ int builtin_system(int argc, char** argv, StreamDevice* io) {
     return 0;
   } else if (!strcmp(argv[0], "lsusb")) {
     return _lsusb(io, argc - 1, &(argv[1]));
+  } else if (!strcmp(argv[0], "vbatt")) {
+    io->printf("Battery voltage: %f\n", (double)get_battery_voltage());
+    return 0;
+  } else if (!strcmp(argv[0], "btnstatus")) {
+    io->printf("User Button: %hhu\n", read_user_button());
+    return 0;
   }
 
   return -100;

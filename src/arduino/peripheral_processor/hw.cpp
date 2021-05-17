@@ -12,11 +12,12 @@
 
 #define BUFFER_SZ 1024
 
-#define VIBRATE 14
-#define CTP_RESET 15
+#define VIBRATE 4
+#define CTP_RESET 5
+#define USR_BTN 2
 
-#define LCD_BRIGHTNESS 33
-#define V_SENS 40
+#define LCD_BRIGHTNESS 3
+#define V_SENS A8
 
 USBHost myusb;
 USBHub hub1(myusb);
@@ -99,14 +100,44 @@ int _lsusb(StreamDevice* io, int ac, char** av) {
   }
 }
 
+
+void set_vibrator_state(bool state) {
+  digitalWrite(VIBRATE, state);
+}
+
+void reset_touch_ic() {
+  digitalWrite(CTP_RESET, LOW);
+  bootloader_delay(10);
+  digitalWrite(CTP_RESET, HIGH);
+}
+
+void set_screen_brightness(float percent) {
+  if (percent < 1)
+    set_min_cpu_hz(MIN_CLOCK_SPEED);
+  else
+    set_min_cpu_hz(MAX_CLOCK_SPEED / 3);
+  analogWrite(LCD_BRIGHTNESS, (int)(percent / 100 * 1024));
+}
+
+float get_battery_voltage() {
+  float pin_voltage = (analogRead(V_SENS) / 1024.0f * 3.3);
+  return pin_voltage * 2;
+}
+
+bool read_user_button() {
+  return !digitalRead(USR_BTN);
+}
+
 void hw_preinit() {
-
-  /*analogWriteResolution(10);
+  analogWriteResolution(10);
   pinMode(LCD_BRIGHTNESS, OUTPUT);
+  pinMode(CTP_RESET, OUTPUT);
+  pinMode(VIBRATE, OUTPUT);
   pinMode(V_SENS, INPUT);
-  analogWriteFrequency(33, 20000.0f);
-  set_screen_brightness(0);*/
-
+  pinMode(USR_BTN, INPUT_PULLUP);
+  analogWriteFrequency(LCD_BRIGHTNESS, 20000.0f);
+  set_screen_brightness(0);
+  set_vibrator_state(false);
 }
 
 void start_hw() {
@@ -142,16 +173,11 @@ void start_hw() {
 
   //gps_serial->setBaud(9600);
 
-  // We need to turn devices on here, otherwise the LCD will not start right.
-
-  /*gpio->pinMode(VIBRATE, GPIO_PIN_MODE_OUTPUT);
-  gpio->pinMode(CTP_RESET, GPIO_PIN_MODE_OUTPUT);
-
   reset_touch_ic();
   
   set_vibrator_state(true);
-  delay(100);
-  set_vibrator_state(false);*/
+  bootloader_delay(100);
+  set_vibrator_state(false);
 
   //add_virtual_device(new NMEARawGPS(gps_serial, "uBlox"));
   add_virtual_device(builtin_touchpad = new FT5436Touch(i2c0, nullptr, -1));

@@ -111,5 +111,6 @@ void set_vibrator_state(bool state);
 void reset_touch_ic();
 void set_screen_brightness(float percent);
 float get_battery_voltage();
+bool read_user_button();
 
 #endif

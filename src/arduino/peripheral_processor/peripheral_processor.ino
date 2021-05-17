@@ -346,6 +346,7 @@ void custom_HardFault_HandlerC(unsigned int *hardfault_args)
 }
 
 void setup() {
+  hw_preinit();
   Serial.begin(115200);
 
   if (!Serial)
