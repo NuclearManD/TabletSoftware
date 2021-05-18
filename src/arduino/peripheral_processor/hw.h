@@ -97,9 +97,27 @@ public:
   TeensyI2CPort(int busnum);
 
   bool read(int address, int size, char* data);
+  int readSome(int address, int size, char* data);
   bool write(int address, int size, const char* data);
   void lock();
   void unlock();
+};
+
+class TeensyGPIO: public GPIODevice {
+public:
+  TeensyGPIO(uint8_t* pins, int n_pins);
+
+  virtual void update() {};
+  virtual const char* getName() { return "Teensy GPIO"; }
+
+  virtual int pinCount() { return pin_count; }
+  virtual bool pinMode(int pin, int mode);
+  virtual bool readPin(int pin);
+  virtual bool writePin(int pin, bool state);
+
+private:
+  uint8_t pin_arr[32];
+  int pin_count;
 };
 
 StreamDevice* get_serial_0();
@@ -108,7 +126,6 @@ void start_hw();
 void hw_preinit();
 
 void set_vibrator_state(bool state);
-void reset_touch_ic();
 void set_screen_brightness(float percent);
 float get_battery_voltage();
 bool read_user_button();

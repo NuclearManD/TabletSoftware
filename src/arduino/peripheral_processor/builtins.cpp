@@ -17,7 +17,7 @@ extern int num_threads;
 extern int thread_pids[20];
 extern const char* thread_names[20];
 
-extern FT5436Touch* builtin_touchpad;
+extern CapacitiveTouchDevice* builtin_touchpad;
 
 int builtin_system(int argc, char** argv, StreamDevice* io) {
 
@@ -43,13 +43,14 @@ int builtin_system(int argc, char** argv, StreamDevice* io) {
 
     while (!io->available()) {
       int nPress = builtin_touchpad->numPresses();
-      if (nPress) {
-        Serial.printf("Touch: %hu, %hu, %hu\n",
-          builtin_touchpad->pressXCoord(0),
-          builtin_touchpad->pressYCoord(0),
-          builtin_touchpad->pressZCoord(0)
+      for (int i = 0; i < nPress; i++) {
+        Serial.printf("%i: (%05hu, %05hu), %05hu\n", i,
+          builtin_touchpad->pressXCoord(i),
+          builtin_touchpad->pressYCoord(i),
+          builtin_touchpad->pressZCoord(i)
         );
       }
+      if (nPress) Serial.write('\n');
 
       threads.delay(15);
     }

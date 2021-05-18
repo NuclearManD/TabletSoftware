@@ -14,6 +14,7 @@
 
 #define VIBRATE 4
 #define CTP_RESET 5
+#define CTP_INT 6
 #define USR_BTN 2
 
 #define LCD_BRIGHTNESS 3
@@ -42,6 +43,7 @@ Device* device_list[32];
 
 SerialDevice* serial_0;
 USBKeyboard* ntios_keyboard;
+CapacitiveTouchDevice* builtin_touchpad;
 
 
 Threads::Mutex spi_lock;
@@ -82,8 +84,6 @@ void hid_extra_hook(uint32_t top, uint16_t key) {
   
 }
 
-FT5436Touch* builtin_touchpad;
-
 int _lsusb(StreamDevice* io, int ac, char** av) {
   io->println("\n\nUSB Devices:");
   for (int i = 0; i < CNT_DEVICES; i++) {
@@ -103,12 +103,6 @@ int _lsusb(StreamDevice* io, int ac, char** av) {
 
 void set_vibrator_state(bool state) {
   digitalWrite(VIBRATE, state);
-}
-
-void reset_touch_ic() {
-  digitalWrite(CTP_RESET, LOW);
-  bootloader_delay(10);
-  digitalWrite(CTP_RESET, HIGH);
 }
 
 void set_screen_brightness(float percent) {
@@ -138,9 +132,18 @@ void hw_preinit() {
   analogWriteFrequency(LCD_BRIGHTNESS, 20000.0f);
   set_screen_brightness(0);
   set_vibrator_state(false);
+
+  // Our connections are very noisy...
+  Wire.setClock(100000);
 }
 
 void start_hw() {
+  uint8_t _pins[4] = {
+    CTP_RESET, 
+    CTP_INT,
+    VIBRATE,
+    USR_BTN
+  };
 
   myusb.begin();
   keyboard1.attachPress(key_hook);
@@ -155,6 +158,7 @@ void start_hw() {
 
   HWSerialDevice* gps_serial;
   I2CBusDevice* i2c0;
+  GPIODevice* gpio_dev;
 
   device_list[0] = ntios_keyboard = new USBKeyboard();
   device_list[1] = serial_0 = new USBSerialDevice();
@@ -163,24 +167,24 @@ void start_hw() {
   device_list[4] = new HWSerialDevice(&Serial3);
   device_list[5] = new HWSerialDevice(&Serial4);
   device_list[6] = new HWSerialDevice(&Serial5);
-  device_list[7] = i2c0 = new TeensyI2CPort(0);
+  device_list[7] = gpio_dev = new TeensyGPIO(_pins, 4);
+  device_list[8] = i2c0 = new TeensyI2CPort(0);
   //device_list[8] = new TeensyI2CPort(1);
   //device_list[9] = new TeensyI2CPort(2);
 
   _lsusb(serial_0, 0, nullptr);
 
-  ntios_init(device_list, 8, serial_0);
+  ntios_init(device_list, 9, serial_0);
 
   //gps_serial->setBaud(9600);
-
-  reset_touch_ic();
   
   set_vibrator_state(true);
   bootloader_delay(100);
   set_vibrator_state(false);
 
   //add_virtual_device(new NMEARawGPS(gps_serial, "uBlox"));
-  add_virtual_device(builtin_touchpad = new FT5436Touch(i2c0, nullptr, -1));
+
+  add_virtual_device(builtin_touchpad = new GT911Touch(i2c0, gpio_dev, 0, 1));
 }
 
 
@@ -367,6 +371,22 @@ bool TeensyI2CPort::read(int address, int size, char* data) {
   return bytes >= size;
 }
 
+int TeensyI2CPort::readSome(int address, int size, char* data) {
+  int i = 0;
+
+  if (size > 31)
+    size = 31;
+
+  i2c->requestFrom(address, size);
+  while (i2c->available()) {
+    if (i < size)
+      data[i] = i2c->read();
+    i++;
+  }
+
+  return i;
+}
+
 bool TeensyI2CPort::write(int address, int size, const char* data) {
   //Serial.print(address, HEX);
   //Serial.print(" : ");
@@ -379,7 +399,11 @@ bool TeensyI2CPort::write(int address, int size, const char* data) {
   }
   //Serial.println();
   //Serial.flush();
-  i2c->endTransmission();
+  int status = i2c->endTransmission();
+  if (status != 0) {
+    Serial.printf("I2C write errno %i\n", status);
+    return false;
+  }
   return true;
 }
 
@@ -394,6 +418,47 @@ void TeensyI2CPort::unlock() {
   //Serial.flush();
   d_lock.unlock();
 }
+
+TeensyGPIO::TeensyGPIO(uint8_t* pins, int n_pins) {
+  memcpy(pin_arr, pins, n_pins);
+  pin_count = n_pins;
+}
+
+bool TeensyGPIO::pinMode(int pin, int mode) {
+  if (pin < 0 || pin >= pin_count)
+    return false;
+
+  if (mode == GPIO_PIN_MODE_INPUT)
+    pinMode(pin_arr[pin], INPUT);
+  else if (mode == GPIO_PIN_MODE_OUTPUT)
+    pinMode(pin_arr[pin], OUTPUT);
+  else if (mode == GPIO_PIN_MODE_INPUT_PULLUP)
+    pinMode(pin_arr[pin], INPUT_PULLUP);
+  else if (mode == GPIO_PIN_MODE_INPUT_PULLDOWN)
+    pinMode(pin_arr[pin], INPUT_PULLDOWN);
+  else if (mode == GPIO_PIN_MODE_HIGH_Z)
+    pinMode(pin_arr[pin], INPUT);
+  else
+    return false;
+
+  return true;
+}
+
+bool TeensyGPIO::readPin(int pin) {
+  if (pin < 0 || pin >= pin_count)
+    return false;
+
+  return digitalRead(pin_arr[pin]);
+}
+
+bool TeensyGPIO::writePin(int pin, bool state) {
+  if (pin < 0 || pin >= pin_count)
+    return false;
+
+  digitalWrite(pin_arr[pin], state);
+  return true;
+}
+
 
 
 StreamDevice* get_serial_0() {
