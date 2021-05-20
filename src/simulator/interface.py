@@ -50,10 +50,10 @@ class TabletEPaperDisplay:
         print("Lifted the pen at", (x, y))
 
     # setter/getter
-    def setBG(bg):
+    def setBG(self, bg):
         self.bg=bg
-    def getBG():
-        return bg
+    def getBG(self):
+        return self.bg
 
 class TabletHardware:
     def __init__(self):
