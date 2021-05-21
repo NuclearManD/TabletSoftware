@@ -16,12 +16,21 @@ int num_threads = 0;
 int thread_pids[20];
 const char* thread_names[20];
 
+/*
+ * This function is called whenever a new thread is created.
+ * It tracks the information about the thread so programs can
+ * collect metrics and reference running threads.
+ */
 void on_new_thread(int pid, const char* name) {
   thread_pids[num_threads] = pid;
   thread_names[num_threads] = name;
   num_threads++;
 }
 
+/*
+ * Called when a thread dies.  Deletes the thread's
+ * metadata from memory so it is no longer tracked.
+ */
 void on_killed_thread(int pid) {
   for (int i = 0; i < num_threads; i++) {
     if (thread_pids[i] == pid) {
@@ -33,6 +42,9 @@ void on_killed_thread(int pid) {
   }
 }
 
+/*
+ * Structs for storing information about new threads
+ */
 typedef struct launch_params_s {
   int argc;
   char** argv;
@@ -44,6 +56,9 @@ typedef struct startf_data_s {
   void (*f)(void*);
 } startf_data_t;
 
+/*
+ * The wrappers help ensure on_new_thread is called, and they help manage the thread's memory
+ */
 void _launch_wrapper(void* raw) {
   launch_params_t* s = (launch_params_t*)raw;
   ntios_system(s->argc, s->argv, s->io);
@@ -64,6 +79,9 @@ void startf_wrapper(void* datap) {
   on_killed_thread(threads.id());
 }
 
+/*
+ * Run a shell command in a new thread
+ */
 bool launch(int argc, char** argv, StreamDevice* io) {
 
   // Compute size of memory to store program arguments
@@ -91,10 +109,16 @@ bool launch(int argc, char** argv, StreamDevice* io) {
   return true;
 }
 
+/*
+ * Run a shell command in a new thread
+ */
 bool launch(char* argv, StreamDevice* io) {
   return launch(1, &argv, io);
 }
 
+/*
+ * Start a function in a new thread
+ */
 bool start_function(void (*f)(void* param), void* param, int stack_size) {
   startf_data_t* s = (startf_data_t*)malloc(sizeof(startf_data_t));
   if (s == nullptr)
@@ -111,6 +135,10 @@ bool start_function(void (*f)(void* param), void* param, int stack_size) {
   return false;
 }
 
+/*
+ * This is called when a thread uses all of it's stack.
+ * The thread has then crashed and needs to be killed.
+ */
 void stack_overflow_isr(void) {
   threads.kill(threads.id());
   on_killed_thread(threads.id());
@@ -123,18 +151,32 @@ void stack_overflow_isr(void) {
   }
 }
 
+/*
+ * This tells NTIOS how long a thread typically runs for, in microseconds.
+ */
 int get_bootloader_thread_slice_us() {
   return 10000;
 }
 
+/*
+ * This is like the Arduino delay(), but it gives control to the OS while waiting.
+ */
 void bootloader_delay(long milliseconds) {
   threads.delay(milliseconds);
 }
 
+/*
+ * External variables for hacking interrupts
+ */
 extern void (* _VectorsRam[NVIC_NUM_INTERRUPTS+16])(void);
 extern void unused_interrupt_vector(void);
 
 
+/*
+ * All this shit is for handling when the OS crashes.
+ * If any of this code executes it means something went
+ * *very* wrong.
+ */
 // Stack frame
 //  xPSR
 //  ReturnAddress
@@ -345,6 +387,9 @@ void custom_HardFault_HandlerC(unsigned int *hardfault_args)
   while(1);
 }
 
+/*
+ * This function sets up the hardware, then launches the OS.
+ */
 void setup() {
   hw_preinit();
   Serial.begin(115200);
@@ -374,15 +419,26 @@ void setup() {
   }
 }
 
+/*
+ * Ticks the drivers.  Every 15 milliseconds each driver has to have it's update()
+ * function called.
+ */
 void loop() {
   // 66.7Hz
   long next_update = millis() + 15;
+
+  // Tick the drivers
   ntios_yield();
   long t = next_update - millis();
   //Serial.println(t);
   threads.delay(next_update - millis());
 }
 
+/*
+ * This is called in busy wait loops so
+ * that the CPU time can be given back to
+ * the OS.
+ */
 void bootloader_yield() {
   threads.yield();
 }
