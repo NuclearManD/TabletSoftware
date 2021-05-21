@@ -19,9 +19,16 @@ extern const char* thread_names[20];
 
 extern CapacitiveTouchDevice* builtin_touchpad;
 
+
+/*
+ * Each of the if blocks here is a shell command.
+ * These shell commands are unique to this hardware, universal
+ * ntios shell commands can be found in shell.cpp in src/ntios/.
+ */
 int builtin_system(int argc, char** argv, StreamDevice* io) {
 
   if (!strcmp(argv[0], "mkpwm")) {
+    // This command creates a PWM driver on a given pin.
     if (argc > 1) {
       char* echk;
       int pin = (int)strtol(argv[1], &echk, 10);
@@ -38,6 +45,8 @@ int builtin_system(int argc, char** argv, StreamDevice* io) {
     }
 
   } else if (!strcmp(argv[0], "touchtest")) {
+    // This command can be used to test the touchscreen.
+
     while (io->available())
       io->read();
 
@@ -59,6 +68,8 @@ int builtin_system(int argc, char** argv, StreamDevice* io) {
     return 0;
 
   } else if (!strcmp(argv[0], "ps")) {
+    // Show currently running threads.  This command has some bugs...
+
     io->printf("Total CPU usage %.2f%%.  Collecting data...\n", get_cpu_usage_percent());
 
     uint32_t total_cycles[num_threads];
@@ -76,14 +87,22 @@ int builtin_system(int argc, char** argv, StreamDevice* io) {
       io->printf("  % 2i % 30s  %.2f%%\n", pid, thread_names[i], percent_usage);
     }
     return 0;
+
   } else if (!strcmp(argv[0], "lsusb")) {
+    // List connected USB devices.  Incompatible devices (probably) won't be shown.
     return _lsusb(io, argc - 1, &(argv[1]));
+
   } else if (!strcmp(argv[0], "vbatt")) {
+    // Show battery voltage
     io->printf("Battery voltage: %f\n", (double)get_battery_voltage());
     return 0;
+
   } else if (!strcmp(argv[0], "btnstatus")) {
+    // Check the user button.  This is for hardware debugging and isn't
+    // really useful for a known working device.
     io->printf("User Button: %hhu\n", read_user_button());
     return 0;
+
   }
 
   return -100;
