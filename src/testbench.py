@@ -9,19 +9,10 @@ class Tb:
 
         # Register this class so we get notified of
         # events, like pen presses.
-        hardware.display.registerCallbackHandler(self)
+        #hardware.display.registerCallbackHandler(self)
 
         self.hardware = hardware
         self.bg = bg
-
-    def onDragStart(self, x, y):
-        self.start = (x, y)
-
-    def onDragPoint(self, x, y):
-        self.hardware.display.setPixel(x, y, 1 - self.bg)
-
-    def onDragStop(self, x, y):
-        print("Lifted the pen at", (x, y))
-
+        
 hardware = TabletHardware()
 tb = Tb(hardware)
