@@ -4,10 +4,13 @@
 #include "USBHost_t36.h"
 #include <Wire.h>
 #include <util/atomic.h>
+#include "Adafruit_GFX.h"
+#include "Adafruit_RA8875.h"
 
 #include "TeensyThreads.h"
 #include "src/ntios/ntios.h"
 #include "src/ntios/drivers/ctp_drivers.h"
+//#include "src/ntios/drivers/graphics/ra8875.h"
 #include "hw.h"
 
 #define BUFFER_SZ 1024
@@ -19,6 +22,9 @@
 
 #define LCD_BRIGHTNESS 3
 #define V_SENS A8
+
+#define RA8875_CS 10
+#define RA8875_RESET 3
 
 USBHost myusb;
 USBHub hub1(myusb);
@@ -42,9 +48,10 @@ volatile int keyboard_buffer_idx = 0;
 Device* device_list[32];
 
 SerialDevice* serial_0;
+SerialDevice* pi_serial;
 USBKeyboard* ntios_keyboard;
 CapacitiveTouchDevice* builtin_touchpad;
-
+RA8875Graphics* builtin_display;
 
 Threads::Mutex spi_lock;
 
@@ -138,11 +145,13 @@ void hw_preinit() {
 }
 
 void start_hw() {
-  uint8_t _pins[4] = {
+  uint8_t _pins[6] = {
     CTP_RESET, 
     CTP_INT,
     VIBRATE,
-    USR_BTN
+    USR_BTN,
+    RA8875_CS,
+    RA8875_RESET
   };
 
   myusb.begin();
@@ -157,26 +166,28 @@ void start_hw() {
   }
 
   HWSerialDevice* gps_serial;
-  I2CBusDevice* i2c0;
+  I2CBusDevice* i2c0 = new TeensyI2CPort(0);
+  SPIBusDevice* spi = new TeensySPIPort();
   GPIODevice* gpio_dev;
 
   device_list[0] = ntios_keyboard = new USBKeyboard();
   device_list[1] = serial_0 = new USBSerialDevice();
-  device_list[2] = new HWSerialDevice(&Serial1);
+  device_list[2] = pi_serial = new HWSerialDevice(&Serial1);
   device_list[3] = gps_serial = new HWSerialDevice(&Serial2);
   device_list[4] = new HWSerialDevice(&Serial3);
   device_list[5] = new HWSerialDevice(&Serial4);
   device_list[6] = new HWSerialDevice(&Serial5);
-  device_list[7] = gpio_dev = new TeensyGPIO(_pins, 4);
-  device_list[8] = i2c0 = new TeensyI2CPort(0);
-  //device_list[8] = new TeensyI2CPort(1);
-  //device_list[9] = new TeensyI2CPort(2);
+  device_list[7] = gpio_dev = new TeensyGPIO(_pins, 6);
+  device_list[8] = i2c0;
+  device_list[9] = spi;
 
   _lsusb(serial_0, 0, nullptr);
 
-  ntios_init(device_list, 9, serial_0);
+  ntios_init(device_list, 10, serial_0);
 
   //gps_serial->setBaud(9600);
+
+  pi_serial->setBaud(115200);
   
   set_vibrator_state(true);
   bootloader_delay(100);
@@ -185,6 +196,13 @@ void start_hw() {
   //add_virtual_device(new NMEARawGPS(gps_serial, "uBlox"));
 
   add_virtual_device(builtin_touchpad = new GT911Touch(i2c0, gpio_dev, 0, 1));
+  //add_virtual_device(builtin_display = RA8875::create800x480(spi, gpio_dev, 5, 4));
+  add_virtual_device(builtin_display = new RA8875Graphics(RA8875_CS, RA8875_RESET));
+
+  //builtin_display->displayOn(true);
+  builtin_display->setBrightness(20);
+  builtin_display->clearScreen(0);
+  builtin_display->fillRect(100, 100, 200, 200, 1970);
 }
 
 
@@ -310,6 +328,242 @@ void USBSerialDevice::setBaud(uint32_t baud) {
   }
 }
 
+RA8875Graphics::RA8875Graphics(int cs, int rst) {
+  spi_lock.lock();
+  tft = new Adafruit_RA8875(cs, rst);
+  tft->begin(RA8875_800x480);
+  tft->displayOn(true);
+  tft->GPIOX(true);      // Enable TFT - display enable tied to GPIOX
+  tft->PWM1config(true, RA8875_PWM_CLK_DIV1024); // PWM output for backlight
+  tft->fillScreen(0);
+  tft->setRotation(1);
+  tft->setTextColor(0xFFFF, 0);
+  spi_lock.unlock();
+}
+
+void RA8875Graphics::setBrightness(double brightness) {
+  tft->PWM1out((int)(brightness * 2.55));
+}
+
+size_t RA8875Graphics::write(uint8_t val) {
+  data_lock.lock();
+  if (buflen >= 1023) {
+    data_lock.unlock();
+    flush();
+    data_lock.lock();
+  }
+  buffer[buflen++] = val;
+  data_lock.unlock();
+  return 1;
+}
+
+void RA8875Graphics::flush() {
+  while (buflen > 0)
+    threads.yield();
+}
+
+void RA8875Graphics::renderLines(int nlines){
+  spi_lock.lock();
+  tft->setCursor(0, 0);
+  for (int y = 0; y < nlines; y++) {
+    tft->println(getLine(y));
+  }
+  spi_lock.unlock();
+}
+
+void RA8875Graphics::clearScreen(uint16_t color) {
+  flush();
+  data_lock.lock();
+  spi_lock.lock();
+  if (color == 0) {
+    tft->setTextColor(0);
+    spi_lock.unlock();
+    renderLines();
+    spi_lock.lock();
+  } else {
+    tft->fillScreen(color);
+  }
+  tft->setTextColor(0xFFFF, 0);
+  tft->setCursor(0, 0);
+  spi_lock.unlock();
+  lineno = 0;
+  lineoff = 0;
+  column = 0;
+  buflen = 0;
+  for (int i = 0; i < 40; i++) {
+    for (int j = 0; j < 80; j++)
+      lines[i][j] = ' ';
+    lines[i][80] = 0;
+  }
+  data_lock.unlock();
+}
+
+int RA8875Graphics::setTextCursor(int x, int y) {
+  if (x >= getTextColumns() || y >= getTextLines())
+    return ERR_OUT_OF_BOUNDS;
+  flush();
+  data_lock.lock();
+  column = x;
+  lineno = y;
+  x *= 6 * textsize;
+  y *= 8 * textsize;
+  data_lock.unlock();
+  spi_lock.lock();
+  tft->setCursor(x, y);
+  spi_lock.unlock();
+
+  return 0;
+}
+
+int RA8875Graphics::getTextLines() {
+  return 30 / textsize;
+}
+
+int RA8875Graphics::getTextColumns() {
+  return 100 / textsize;
+}
+
+void RA8875Graphics::scrollDown(int lines) {
+  spi_lock.lock();
+  tft->setTextColor(0);
+  spi_lock.unlock();
+  renderLines();
+  for (int i = 0; i < lines; i++) {
+    memset(getLine(i), ' ', 80); // clear top line
+    lineoff++; // go down a line
+    lineno--; // mark that a line has been deleted (top line is gone)
+  }
+  spi_lock.lock();
+  tft->setTextColor(0xFFFF); // faster if we don't render background color
+  spi_lock.unlock();
+  renderLines(40 - lines);
+  spi_lock.lock();
+  tft->setTextColor(0xFFFF, 0); // need backround color now so we can delete old chars
+  spi_lock.unlock();
+}
+
+void RA8875Graphics::autoScrollDown() {
+  // Count the number of newlines so that we scroll less times
+  // Each scroll is extremely expensive
+  // Make sure the data mutex is locked before entering this function
+  // Will scroll down at least once.
+
+  int num_newlines = 0;
+  for (int i = 0; i < buflen; i++) {
+    if (buffer[i] == '\n')
+      num_newlines++;
+  }
+
+  scrollDown(max(num_newlines, 1));
+}
+
+void RA8875Graphics::update() {
+  // screen characters are 40x80 when character size is 1
+  char c;
+
+  if (buflen == 0) return;
+
+  // Use at most 30ms to update at a time, to avoid blocking other drivers
+  long timeout = millis() + 15;
+
+  data_lock.lock();
+  //Serial.printf("[[[ %s ]]]\n", buffer);
+  for (int i = 0; i < buflen; i++) {
+    c = buffer[i];
+    if (c == 8) {
+      // backspace
+      if (column > 0)
+        column--;
+      getLine(lineno)[column] = ' ';
+      int x = column * 6 * textsize;
+      int y = lineno * 8 * textsize;
+      spi_lock.lock();
+      tft->fillRect(x, y, 6 * textsize, 8 * textsize, 0);
+      tft->setCursor(x, y);
+      spi_lock.unlock();
+    } else if (c == 9) {
+      int sx = column * 6 * textsize;
+      int sy = lineno * 8 * textsize;
+      while (column < 80 / textsize) {
+        getLine(lineno)[column++] = ' ';
+        if (column % 4 == 0)
+          break;
+      }
+      if (column >= 80 / textsize) {
+        lineno++;
+        if (lineno >= 40 / textsize)
+          autoScrollDown();
+        else {
+          spi_lock.lock();
+          tft->println();
+          spi_lock.unlock();
+        }
+        column = 0;
+      } else {
+        int x = column * 6 * textsize;
+        int y = lineno * 8 * textsize;
+        spi_lock.lock();
+        tft->setCursor(x, y);
+        tft->fillRect(sx, sy, x - sx, 8 * textsize, 0);
+        spi_lock.unlock();
+      }
+    } else if (c == '\n') {
+      lineno++;
+      if (lineno >= 40 / textsize) {
+        autoScrollDown();
+      } else {
+        spi_lock.lock();
+        tft->println();
+        spi_lock.unlock();
+      }
+      column = 0;
+    } else if (c == '\r') ;
+    else if (c == ' ') {
+      getLine(lineno)[column++] = ' ';
+      int x = column * 6 * textsize;
+      int y = lineno * 8 * textsize;
+      spi_lock.lock();
+      tft->fillRect(x, y, 6 * textsize, 8 * textsize, 0);
+      tft->write(c);
+      spi_lock.unlock();
+      if (column >= 80 / textsize) {
+        column = 0;
+        lineno++;
+        if (lineno >= 40 / textsize) {
+          autoScrollDown();
+        }
+      }
+    } else {
+      if (c == 0) c = ' ';
+      getLine(lineno)[column++] = c;
+      spi_lock.lock();
+      tft->write(c);
+      spi_lock.unlock();
+      if (column >= 80 / textsize) {
+        column = 0;
+        lineno++;
+        if (lineno >= 40 / textsize) {
+          autoScrollDown();
+        }
+      }
+    }
+
+    if (timeout < millis()) {
+      buflen -= i + 1;
+      memmove(buffer, &(buffer[i + 1]), buflen);
+      buffer[buflen] = 0; // for easier printing
+      data_lock.unlock();
+      return;
+    }
+  }
+  buflen = 0;
+  data_lock.unlock();
+}
+
+const char* RA8875Graphics::getName() {
+  return "RA8875 TFT LCD";
+}
+
 TeensyPWMPin::TeensyPWMPin(int pin) {
   pinnum = pin;
   strcpy(name, "Pin ");
@@ -416,6 +670,42 @@ void TeensyI2CPort::lock() {
 void TeensyI2CPort::unlock() {
   //Serial.printf("Unlocking %s\n", name);
   //Serial.flush();
+  d_lock.unlock();
+}
+
+TeensySPIPort::TeensySPIPort() {
+  SPI.begin();
+}
+
+void TeensySPIPort::exchange(int size, const char* out, char* in) {
+  SPI.beginTransaction(SPISettings(4000000, MSBFIRST, SPI_MODE0));
+  if (in != nullptr) {
+    for (int i = 0; i < size; i++)
+      in[i] = SPI.transfer(out[i]);
+  } else {
+    for (int i = 0; i < size; i++)
+      SPI.transfer(out[i]);
+  }
+  SPI.endTransaction();
+}
+
+void TeensySPIPort::exchange(int size, char out, char* in) {
+  SPI.beginTransaction(SPISettings(4000000, MSBFIRST, SPI_MODE0));
+  if (in != nullptr) {
+    for (int i = 0; i < size; i++)
+      in[i] = SPI.transfer(out);
+  } else {
+    for (int i = 0; i < size; i++)
+      SPI.transfer(out);
+  }
+  SPI.endTransaction();
+}
+
+void TeensySPIPort::lock() {
+  d_lock.lock();
+}
+
+void TeensySPIPort::unlock() {
   d_lock.unlock();
 }
 

@@ -5,9 +5,12 @@
 #include "TeensyThreads.h"
 #include "Arduino.h"
 #include <Wire.h>
+#include "Adafruit_GFX.h"
+#include "Adafruit_RA8875.h"
 
 #include "src/ntios/drivers.h"
 #include "src/ntios/ntios.h"
+#include "src/ntios/drivers/graphics/graphics.h"
 
 class NBrainMutex: public BootloaderMutex {
 private:
@@ -70,6 +73,49 @@ public:
   void setBaud(uint32_t baud);
 };
 
+class RA8875Graphics: public GraphicsDisplayDevice {
+private:
+  volatile char buffer[1024];
+  volatile int buflen;
+  volatile int lineno = 0;
+  volatile int lineoff = 0;
+  volatile int column = 0;
+  volatile int textsize = 1;
+  volatile char lines[40][81];
+  Threads::Mutex data_lock;
+  Adafruit_RA8875* tft;
+public:
+
+  RA8875Graphics(int cs, int rst);
+
+  void setBrightness(double brightness);
+
+  // Print implementation
+  size_t write(uint8_t val);
+  using Print::write; // pull in write(str) and write(buf, size) from Print
+  void flush();
+
+  const char* getName();
+  void update();
+
+  void autoScrollDown();
+  void scrollDown(int lines = 1);
+  void renderLines(int nlines = 40);
+  char* getLine(int l) { return lines[(l + lineoff) % 40]; }
+
+  void clearScreen(uint16_t color = 0);
+  int setTextCursor(int x, int y);
+  int getTextLines();
+  int getTextColumns();
+
+  // These don't do anything because this is a text-only display.
+  // We don't have high enough bandwidth to do drawing well, and
+  // doing so would glitch out the screen due to optimizations that
+  // have been made for doing text.  TODO: get a VPU.
+  inline void setPixel(int x, int y, uint16_t color) {}
+  inline void drawBitmap16(int x, int y, int w, int h, uint16_t* data) {}
+};
+
 class TeensyPWMPin: public PWMPin {
 private:
   char name[7];
@@ -99,6 +145,21 @@ public:
   bool read(int address, int size, char* data);
   int readSome(int address, int size, char* data);
   bool write(int address, int size, const char* data);
+  void lock();
+  void unlock();
+};
+
+class TeensySPIPort: public SPIBusDevice {
+private:
+  char* name = "SPI Bus";
+  Threads::Mutex d_lock;
+public:
+  const char* getName() { return name; };
+
+  TeensySPIPort();
+
+  void exchange(int size, const char* out, char* in);
+  void exchange(int size, char out, char* in);
   void lock();
   void unlock();
 };
