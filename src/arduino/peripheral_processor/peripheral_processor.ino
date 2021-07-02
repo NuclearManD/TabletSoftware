@@ -5,6 +5,7 @@
 #include "src/ntios/drivers.h"
 #include "src/ntios/ntios.h"
 #include "hw.h"
+#include "peripherald.h"
 
 #define PROGRAM_STACK_SPACE 1024 * 6
 
@@ -73,7 +74,6 @@ void ntios_shell_wrapper(void* io) {
 
 void startf_wrapper(void* datap) {
   startf_data_t* data = (startf_data_t*)datap;
-  Serial.printf("Starting: %p((void*)%p)\n", data->f, data->param);
   data->f(data->param);
   //free(data);
   on_killed_thread(threads.id());
@@ -130,6 +130,25 @@ bool start_function(void (*f)(void* param), void* param, int stack_size) {
 
   if (id >= 0) {
     on_new_thread(id, "[anonymous function]");
+    return true;
+  }
+  return false;
+}
+
+/*
+ * Start a function in a new thread and specify the thread name
+ */
+bool start_function(void (*f)(void* param), void* param, int stack_size, const char* name) {
+  startf_data_t* s = (startf_data_t*)malloc(sizeof(startf_data_t));
+  if (s == nullptr)
+    return false;
+
+  s->f = f;
+  s->param = param;
+  int id = threads.addThread(startf_wrapper, (void*)s, stack_size);
+
+  if (id >= 0) {
+    on_new_thread(id, name);
     return true;
   }
   return false;
@@ -407,6 +426,7 @@ void setup() {
   threads.setSliceMicros(10000);
 
   start_hw();
+  start_peripherald();
 
   UserIO = get_serial_0();
 
