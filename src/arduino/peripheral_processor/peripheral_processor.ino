@@ -428,7 +428,10 @@ void setup() {
   start_hw();
   start_peripherald();
 
-  UserIO = get_serial_0();
+  UserIO = new JoinedStreamDevice(
+        (StreamDevice*)get_serial_0(),
+        (StreamDevice*)get_device(11));
+  add_virtual_device(UserIO);//get_serial_0();
 
   int id = threads.addThread(ntios_shell_wrapper, UserIO, PROGRAM_STACK_SPACE * 2);
 

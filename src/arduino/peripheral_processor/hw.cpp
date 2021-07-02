@@ -200,9 +200,10 @@ void start_hw() {
   add_virtual_device(builtin_display = new RA8875Graphics(RA8875_CS, RA8875_RESET));
 
   //builtin_display->displayOn(true);
-  builtin_display->setBrightness(20);
+  builtin_display->setBrightness(50);
   builtin_display->clearScreen(0);
   builtin_display->fillRect(100, 100, 200, 200, 1970);
+  builtin_display->println("Hello World!");
 }
 
 
@@ -335,9 +336,10 @@ RA8875Graphics::RA8875Graphics(int cs, int rst) {
   tft->displayOn(true);
   tft->GPIOX(true);      // Enable TFT - display enable tied to GPIOX
   tft->PWM1config(true, RA8875_PWM_CLK_DIV1024); // PWM output for backlight
+
   tft->fillScreen(0);
   tft->setRotation(1);
-  tft->setTextColor(0xFFFF, 0);
+
   spi_lock.unlock();
 }
 
@@ -345,219 +347,40 @@ void RA8875Graphics::setBrightness(double brightness) {
   tft->PWM1out((int)(brightness * 2.55));
 }
 
-size_t RA8875Graphics::write(uint8_t val) {
-  data_lock.lock();
-  if (buflen >= 1023) {
-    data_lock.unlock();
-    flush();
-    data_lock.lock();
-  }
-  buffer[buflen++] = val;
-  data_lock.unlock();
-  return 1;
-}
-
-void RA8875Graphics::flush() {
-  while (buflen > 0)
-    threads.yield();
-}
-
-void RA8875Graphics::renderLines(int nlines){
-  spi_lock.lock();
-  tft->setCursor(0, 0);
-  for (int y = 0; y < nlines; y++) {
-    tft->println(getLine(y));
-  }
-  spi_lock.unlock();
-}
-
 void RA8875Graphics::clearScreen(uint16_t color) {
-  flush();
-  data_lock.lock();
   spi_lock.lock();
-  if (color == 0) {
-    tft->setTextColor(0);
-    spi_lock.unlock();
-    renderLines();
-    spi_lock.lock();
-  } else {
-    tft->fillScreen(color);
+  tft->fillScreen(color);
+  spi_lock.unlock();
+  setTextCursor(0, 0);
+}
+
+void RA8875Graphics::fillRect(int x1, int y1, int x2, int y2, uint16_t color) {
+
+  if (x1 > x2) {
+    int tmp = x1;
+    x1 = x2;
+    x2 = tmp;
   }
-  tft->setTextColor(0xFFFF, 0);
-  tft->setCursor(0, 0);
-  spi_lock.unlock();
-  lineno = 0;
-  lineoff = 0;
-  column = 0;
-  buflen = 0;
-  for (int i = 0; i < 40; i++) {
-    for (int j = 0; j < 80; j++)
-      lines[i][j] = ' ';
-    lines[i][80] = 0;
+
+  if (y1 > y2) {
+    int tmp = y1;
+    y1 = y2;
+    y2 = tmp;
   }
-  data_lock.unlock();
-}
 
-int RA8875Graphics::setTextCursor(int x, int y) {
-  if (x >= getTextColumns() || y >= getTextLines())
-    return ERR_OUT_OF_BOUNDS;
-  flush();
-  data_lock.lock();
-  column = x;
-  lineno = y;
-  x *= 6 * textsize;
-  y *= 8 * textsize;
-  data_lock.unlock();
   spi_lock.lock();
-  tft->setCursor(x, y);
-  spi_lock.unlock();
-
-  return 0;
-}
-
-int RA8875Graphics::getTextLines() {
-  return 30 / textsize;
-}
-
-int RA8875Graphics::getTextColumns() {
-  return 100 / textsize;
-}
-
-void RA8875Graphics::scrollDown(int lines) {
-  spi_lock.lock();
-  tft->setTextColor(0);
-  spi_lock.unlock();
-  renderLines();
-  for (int i = 0; i < lines; i++) {
-    memset(getLine(i), ' ', 80); // clear top line
-    lineoff++; // go down a line
-    lineno--; // mark that a line has been deleted (top line is gone)
-  }
-  spi_lock.lock();
-  tft->setTextColor(0xFFFF); // faster if we don't render background color
-  spi_lock.unlock();
-  renderLines(40 - lines);
-  spi_lock.lock();
-  tft->setTextColor(0xFFFF, 0); // need backround color now so we can delete old chars
+  tft->fillRect(x1, y1, x2 - x1, y2 - y1, color);
   spi_lock.unlock();
 }
 
-void RA8875Graphics::autoScrollDown() {
-  // Count the number of newlines so that we scroll less times
-  // Each scroll is extremely expensive
-  // Make sure the data mutex is locked before entering this function
-  // Will scroll down at least once.
-
-  int num_newlines = 0;
-  for (int i = 0; i < buflen; i++) {
-    if (buffer[i] == '\n')
-      num_newlines++;
-  }
-
-  scrollDown(max(num_newlines, 1));
+void RA8875Graphics::scrollDownPixels(uint32_t pixels) {
+  
 }
 
-void RA8875Graphics::update() {
-  // screen characters are 40x80 when character size is 1
-  char c;
-
-  if (buflen == 0) return;
-
-  // Use at most 30ms to update at a time, to avoid blocking other drivers
-  long timeout = millis() + 15;
-
-  data_lock.lock();
-  //Serial.printf("[[[ %s ]]]\n", buffer);
-  for (int i = 0; i < buflen; i++) {
-    c = buffer[i];
-    if (c == 8) {
-      // backspace
-      if (column > 0)
-        column--;
-      getLine(lineno)[column] = ' ';
-      int x = column * 6 * textsize;
-      int y = lineno * 8 * textsize;
-      spi_lock.lock();
-      tft->fillRect(x, y, 6 * textsize, 8 * textsize, 0);
-      tft->setCursor(x, y);
-      spi_lock.unlock();
-    } else if (c == 9) {
-      int sx = column * 6 * textsize;
-      int sy = lineno * 8 * textsize;
-      while (column < 80 / textsize) {
-        getLine(lineno)[column++] = ' ';
-        if (column % 4 == 0)
-          break;
-      }
-      if (column >= 80 / textsize) {
-        lineno++;
-        if (lineno >= 40 / textsize)
-          autoScrollDown();
-        else {
-          spi_lock.lock();
-          tft->println();
-          spi_lock.unlock();
-        }
-        column = 0;
-      } else {
-        int x = column * 6 * textsize;
-        int y = lineno * 8 * textsize;
-        spi_lock.lock();
-        tft->setCursor(x, y);
-        tft->fillRect(sx, sy, x - sx, 8 * textsize, 0);
-        spi_lock.unlock();
-      }
-    } else if (c == '\n') {
-      lineno++;
-      if (lineno >= 40 / textsize) {
-        autoScrollDown();
-      } else {
-        spi_lock.lock();
-        tft->println();
-        spi_lock.unlock();
-      }
-      column = 0;
-    } else if (c == '\r') ;
-    else if (c == ' ') {
-      getLine(lineno)[column++] = ' ';
-      int x = column * 6 * textsize;
-      int y = lineno * 8 * textsize;
-      spi_lock.lock();
-      tft->fillRect(x, y, 6 * textsize, 8 * textsize, 0);
-      tft->write(c);
-      spi_lock.unlock();
-      if (column >= 80 / textsize) {
-        column = 0;
-        lineno++;
-        if (lineno >= 40 / textsize) {
-          autoScrollDown();
-        }
-      }
-    } else {
-      if (c == 0) c = ' ';
-      getLine(lineno)[column++] = c;
-      spi_lock.lock();
-      tft->write(c);
-      spi_lock.unlock();
-      if (column >= 80 / textsize) {
-        column = 0;
-        lineno++;
-        if (lineno >= 40 / textsize) {
-          autoScrollDown();
-        }
-      }
-    }
-
-    if (timeout < millis()) {
-      buflen -= i + 1;
-      memmove(buffer, &(buffer[i + 1]), buflen);
-      buffer[buflen] = 0; // for easier printing
-      data_lock.unlock();
-      return;
-    }
-  }
-  buflen = 0;
-  data_lock.unlock();
+void RA8875Graphics::setPixel(int x, int y, uint16_t color) {
+  spi_lock.lock();
+  tft->drawPixel(x, y, color);
+  spi_lock.unlock();
 }
 
 const char* RA8875Graphics::getName() {

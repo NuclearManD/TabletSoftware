@@ -141,7 +141,7 @@ void peripherald(void* arg) {
   peripherald_wait_companion_boot();
 
   if (do_peripherald_login() != 0) {
-    debug("Login failure: Exiting peripherald\n");
+    debug("Login failure: Exiting peripheral.d\n");
     return;
   }
 

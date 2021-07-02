@@ -75,15 +75,8 @@ public:
 
 class RA8875Graphics: public GraphicsDisplayDevice {
 private:
-  volatile char buffer[1024];
-  volatile int buflen;
-  volatile int lineno = 0;
-  volatile int lineoff = 0;
-  volatile int column = 0;
-  volatile int textsize = 1;
-  volatile char lines[40][81];
-  Threads::Mutex data_lock;
   Adafruit_RA8875* tft;
+
 public:
 
   RA8875Graphics(int cs, int rst);
@@ -91,29 +84,21 @@ public:
   void setBrightness(double brightness);
 
   // Print implementation
-  size_t write(uint8_t val);
   using Print::write; // pull in write(str) and write(buf, size) from Print
-  void flush();
 
   const char* getName();
-  void update();
+  void update() {}
 
-  void autoScrollDown();
-  void scrollDown(int lines = 1);
-  void renderLines(int nlines = 40);
-  char* getLine(int l) { return lines[(l + lineoff) % 40]; }
+  void scrollDownPixels(uint32_t pixels);
 
   void clearScreen(uint16_t color = 0);
-  int setTextCursor(int x, int y);
-  int getTextLines();
-  int getTextColumns();
+  uint32_t getWidth() { return 800; }
+  uint32_t getHeight() { return 480; }
 
-  // These don't do anything because this is a text-only display.
-  // We don't have high enough bandwidth to do drawing well, and
-  // doing so would glitch out the screen due to optimizations that
-  // have been made for doing text.  TODO: get a VPU.
-  inline void setPixel(int x, int y, uint16_t color) {}
+  void setPixel(int x, int y, uint16_t color);
+  void fillRect(int x1, int y1, int x2, int y2, uint16_t color);
   inline void drawBitmap16(int x, int y, int w, int h, uint16_t* data) {}
+
 };
 
 class TeensyPWMPin: public PWMPin {
