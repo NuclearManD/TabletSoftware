@@ -28,6 +28,9 @@
 #define PERIPHERALD_SERIAL_BUFFER_SIZE  1024
 #define PERIPHERALD_VRAM_SIZE           1024 * 256
 
+#define PERIPHERALD_BATTERY_CHECK_MS  1000
+#define PERIPHERALD_TOUCH_CHECK_MS    8
+
 #define debug(...) Serial.printf(__VA_ARGS__)
 
 
@@ -40,6 +43,7 @@ extern RA8875Graphics* builtin_display;
 uint16_t* vram;
 uint8_t _peripherald_serial_buffer[PERIPHERALD_SERIAL_BUFFER_SIZE];
 bool _is_peripherald_loading = true;
+int peripherald_num_vram_sectors;
 
 /*
  * Wait for a string from the Pi's serial port
@@ -196,6 +200,41 @@ static inline void display_bootup_screen() {
   start_function(loading_swirl_thread, nullptr, 2048, "peripheral.d/ld_disp");
 }
 
+void peripherald_send_updates_to_companion() {
+  static long battery_check_timer = 0;
+  static long touch_check_timer = 0;
+  static uint8_t last_num_touches = 0;
+
+  // Check battery voltage
+  // [except we don't have a voltage or current sensor yet :-P]
+
+  // Check touches
+  if (touch_check_timer < millis()) {
+    uint8_t num_touches = builtin_touchpad->numPresses();
+
+    // Don't send touches if nobody is touching the display and we already reported so
+    if (last_num_touches != 0 || num_touches != 0) {
+      pi_serial->write(EVENT_ON_CTP_CHANGE);
+      pi_serial->write(num_touches);
+      for (uint8_t i = 0; i < num_touches; i++) {
+        uint16_t x = builtin_touchpad->pressXCoord(i);
+        uint16_t y = builtin_touchpad->pressYCoord(i);
+        uint16_t z = builtin_touchpad->pressZCoord(i);
+        pi_serial->write(x >> 8);
+        pi_serial->write(x & 255);
+        pi_serial->write(y >> 8);
+        pi_serial->write(y & 255);
+        pi_serial->write(z >> 8);
+        pi_serial->write(z & 255);
+        debug("%i: %i, %i, %i\n", i, x, y, z);
+      }
+    }
+
+    last_num_touches = num_touches;
+    touch_check_timer = millis() + PERIPHERALD_TOUCH_CHECK_MS;
+  }
+}
+
 /*
  * Main method of peripheral.d.
  */
@@ -206,6 +245,12 @@ void peripherald(void* arg) {
   if (vram == nullptr) {
     debug("WARNING: Failed to allocate %i bytes for VRAM.  Allocating 32K instead.\n", PERIPHERALD_VRAM_SIZE);
     vram = (uint16_t*)malloc(32 * 1024);
+
+    // 256 elements per sector, 2 bytes per element = 512 bytes per sector
+    peripherald_num_vram_sectors = 32 * 1024 / 512;
+  } else {
+    // 256 elements per sector, 2 bytes per element = 512 bytes per sector
+    peripherald_num_vram_sectors = PERIPHERALD_VRAM_SIZE / 512;
   }
 
   display_bootup_screen();
@@ -231,11 +276,15 @@ void peripherald(void* arg) {
   while (true) {
 
     // Wait for some bytes
-    while (!pi_serial->available())
+    while (!pi_serial->available()) {
       bootloader_yield();
 
+      // Check for input changes (keypresses, touches, battery changes, etc)
+      peripherald_send_updates_to_companion();
+    }
+
     // Read in the data
-    while (pi_serial->available() && i < PERIPHERALD_SERIAL_BUFFER_SIZE)
+    while (pi_serial->available())
       _peripherald_serial_buffer[i++] = pi_serial->read();
 
     // Process input
@@ -391,6 +440,11 @@ int process_gpu_commands(const char* src, int len) {
       uint8_t il = (uint8_t)src[i++];
       size_t index = ((ih << 16) | (il << 8));
 
+      if (index >= peripherald_num_vram_sectors) {
+        i += 512;
+        continue;
+      }
+
       for (char j = 0; j < 256; j++) {
         char high = src[i++];
         char low = src[i++];
@@ -414,6 +468,10 @@ int process_gpu_commands(const char* src, int len) {
       uint16_t x = (xh << 8) | xl;
       uint16_t y = (yh << 8) | yl;
       size_t index = ((ih << 16) | (il << 8));
+
+      if (index >= peripherald_num_vram_sectors) {
+        continue;
+      }
 
       builtin_display->drawBitmap16(x, y, xs, ys, &(vram[index]));
 
@@ -443,6 +501,10 @@ int process_gpu_commands(const char* src, int len) {
       uint16_t x = (xh << 8) | xl;
       uint16_t y = (yh << 8) | yl;
       size_t index = ((ih << 16) | (il << 8));
+
+      if (index >= peripherald_num_vram_sectors) {
+        continue;
+      }
 
       uint16_t* color_palette = &(vram[index]);
       uint16_t* image_data = &(vram[index + palette_size]);
