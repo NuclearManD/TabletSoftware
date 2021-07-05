@@ -276,15 +276,17 @@ void drawPaletteImage16(uint16_t x, uint16_t y, uint8_t w, uint8_t ys, uint16_t*
 int process_gpu_commands(const char* src, int len) {
   int i = 0;
   while (len > i) {
-    char command = src[i++];
+    char command = src[i];
 
     if (command == CMD_REQUEST_ACKNOWLEDGE) {
+      i++;
       pi_serial->write(EVENT_ACKNOWLEDGE);
 
     } else if (command == CMD_SET_CURSOR_PIXELS) {
-      if (len - i < 4)
+      if (len - i < 5)
         break;
 
+      i++;
       char xh = src[i++];
       char xl = src[i++];
       char yh = src[i++];
@@ -295,20 +297,22 @@ int process_gpu_commands(const char* src, int len) {
       builtin_display->setTextCursorPixels(x, y);
       
     } else if (command == CMD_WRITE_TEXT) {
-      if (len - i < 1)
+      if (len - i < 2)
         break;
 
-      char s_len = src[i];
-      if (len - i - 1 < s_len)
+      char s_len = src[i + 1];
+      if (len - i - 2 < s_len)
         break;
 
+      i++;
       builtin_display->write(&src[++i], s_len);
       i += s_len;
 
     } else if (command == CMD_DRAW_PIXEL) {
-      if (len - i < 6)
+      if (len - i < 7)
         break;
 
+      i++;
       char xh = src[i++];
       char xl = src[i++];
       char yh = src[i++];
@@ -322,9 +326,10 @@ int process_gpu_commands(const char* src, int len) {
       builtin_display->setPixel(x, y, c);
 
     } else if (command == CMD_FILL_RECT) {
-      if (len - i < 10)
+      if (len - i < 11)
         break;
 
+      i++;
       char x1h = src[i++];
       char x1l = src[i++];
       char y1h = src[i++];
@@ -344,9 +349,10 @@ int process_gpu_commands(const char* src, int len) {
       builtin_display->fillRect(x1, y1, x2, y2, c);
 
     } else if (command == CMD_DRAW_RECT) {
-      if (len - i < 10)
+      if (len - i < 11)
         break;
 
+      i++;
       char x1h = src[i++];
       char x1l = src[i++];
       char y1h = src[i++];
@@ -366,9 +372,10 @@ int process_gpu_commands(const char* src, int len) {
       builtin_display->drawRect(x1, y1, x2, y2, c);
 
     } else if (command == CMD_SET_TEXT_COLOR) {
-      if (len - i < 2)
+      if (len - i < 3)
         break;
 
+      i++;
       char ch = src[i++];
       char cl = src[i++];
       uint16_t c = (ch << 8) | cl;
@@ -376,9 +383,10 @@ int process_gpu_commands(const char* src, int len) {
       builtin_display->setTextColor(c);
 
     } else if (command == CMD_WRITE_VRAM) {
-      if (len - i < 2 + 512)
+      if (len - i < 3 + 512)
         break;
 
+      i++;
       uint8_t ih = (uint8_t)src[i];
       uint8_t il = (uint8_t)src[i++];
       size_t index = ((ih << 16) | (il << 8));
@@ -390,9 +398,10 @@ int process_gpu_commands(const char* src, int len) {
       }
 
     } else if (command == CMD_RENDER_BITMAP) {
-      if (len - i < 8)
+      if (len - i < 9)
         break;
 
+      i++;
       uint8_t ih = (uint8_t)src[i];
       uint8_t il = (uint8_t)src[i++];
       char xh = src[i++];
@@ -409,16 +418,18 @@ int process_gpu_commands(const char* src, int len) {
       builtin_display->drawBitmap16(x, y, xs, ys, &(vram[index]));
 
     } else if (command == CMD_SELECT_DISPLAY) {
-      if (len - i < 1)
+      if (len - i < 2)
         break;
 
       // For now this command is ignored because we only have one display
       i++;
+      i++;
 
     } else if (command == CMD_DRAW_PALETTE_IMAGE) {
-      if (len - i < 9)
+      if (len - i < 10)
         break;
 
+      i++;
       uint8_t ih = (uint8_t)src[i];
       uint8_t il = (uint8_t)src[i++];
       char xh = src[i++];
@@ -438,15 +449,19 @@ int process_gpu_commands(const char* src, int len) {
       drawPaletteImage16(x, y, xs, ys, color_palette, image_data);
 
     } else if (command == CMD_FILL_DISPLAY) {
-      if (len - i < 2)
+      if (len - i < 3)
         break;
 
+      i++;
       char ch = src[i++];
       char cl = src[i++];
       uint16_t c = (ch << 8) | cl;
 
       builtin_display->clearScreen(c);
 
+    } else {
+      // INVALID COMMAND BYTE
+      i++;
     }
   }
 
