@@ -198,12 +198,6 @@ void start_hw() {
   add_virtual_device(builtin_touchpad = new GT911Touch(i2c0, gpio_dev, 0, 1));
   //add_virtual_device(builtin_display = RA8875::create800x480(spi, gpio_dev, 5, 4));
   add_virtual_device(builtin_display = new RA8875Graphics(RA8875_CS, RA8875_RESET));
-
-  //builtin_display->displayOn(true);
-  builtin_display->setBrightness(50);
-  builtin_display->clearScreen(0);
-  builtin_display->fillRect(100, 100, 200, 200, 1970);
-  builtin_display->println("Hello World!");
 }
 
 
@@ -375,6 +369,14 @@ void RA8875Graphics::fillRect(int x1, int y1, int x2, int y2, uint16_t color) {
 
 void RA8875Graphics::scrollDownPixels(uint32_t pixels) {
   
+}
+
+void RA8875Graphics::drawBitmap16(int x, int y, int w, int h, uint16_t* data) {
+  h += y;
+  for (y; y < h; y++) {
+    tft->drawPixels(data, w, x, y);
+    data = &data[w];
+  }
 }
 
 void RA8875Graphics::setPixel(int x, int y, uint16_t color) {

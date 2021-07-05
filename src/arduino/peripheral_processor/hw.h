@@ -97,7 +97,7 @@ public:
 
   void setPixel(int x, int y, uint16_t color);
   void fillRect(int x1, int y1, int x2, int y2, uint16_t color);
-  inline void drawBitmap16(int x, int y, int w, int h, uint16_t* data) {}
+  void drawBitmap16(int x, int y, int w, int h, uint16_t* data);
 
 };
 

@@ -17,6 +17,11 @@ int num_threads = 0;
 int thread_pids[20];
 const char* thread_names[20];
 
+char _password_hash[] = {
+  0xe9, 0xa6, 0xea, 0x82, 0xc8, 0xa5, 0xbb, 0x72, 0x1b, 0x9a, 0x7f, 0x1e, 0x87, 0xbe, 0xf6, 0x12,
+  0xdb, 0x5f, 0xaf, 0xe4, 0x7d, 0x0f, 0xa5, 0x1d, 0x3c, 0x8a, 0x6c, 0x09, 0xf8, 0x99, 0x87, 0x9e
+};
+
 /*
  * This function is called whenever a new thread is created.
  * It tracks the information about the thread so programs can
@@ -68,7 +73,7 @@ void _launch_wrapper(void* raw) {
 }
 
 void ntios_shell_wrapper(void* io) {
-  ntios_shell((StreamDevice*)io);
+  ntios_shell((StreamDevice*)io, _password_hash);
   on_killed_thread(threads.id());
 }
 
@@ -428,11 +433,13 @@ void setup() {
   start_hw();
   start_peripherald();
 
-  UserIO = new JoinedStreamDevice(
-        (StreamDevice*)get_serial_0(),
-        (StreamDevice*)get_device(11));
-  add_virtual_device(UserIO);//get_serial_0();
+  // Really this is just a debug port.  That's why I added the login,
+  // I don't want a bad actor with hardware access to be able to execute
+  // commands on the system.  But I still want to be able to do that
+  // myself.
+  UserIO = get_serial_0();
 
+  threads.delay(1000);
   int id = threads.addThread(ntios_shell_wrapper, UserIO, PROGRAM_STACK_SPACE * 2);
 
   if (id >= 0) {
