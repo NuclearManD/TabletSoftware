@@ -117,4 +117,40 @@ class TabletDisplay:
 
     def setTextColor(self, rgb):
         color = rgb_to_u16(rgb)
-        self.iface._sendBytes(COMMAND)
+        self.iface._sendBytes(COMMAND_DRAW_BITMAP)
+
+    def drawPixel(self, x, y, rgb):
+        pass  # Not done yet
+
+    def fillRect(self, x, y, w, h, rgb):
+        pass  # Not done yet
+
+    def drawRect(self, x, y, w, h, rgb):
+        pass  # Not done yet
+
+    def writeText(self, text):
+        pass  # Not done yet
+
+    def setCursor(self, x, y):
+        pass  # Not done yet
+
+    def writeVRAM(self, sector, data):
+        if type(data) != bytes:
+            raise TypeError("Need a bytes object, not " + str(type(data)))
+        if len(data) != 512:
+            raise ValueError(f"Wrong data size: {len(data)} (expected 512 bytes)")
+        pass  # Not done yet
+
+    def drawLoadedBitmap(self, sector, x, y, w, h):
+        pass  # Not done yet
+
+    def drawImage(self, image):
+        # This will be a "smart function" that handles VRAM allocation, caching, and drawing automatically.
+        pass  # Not done yet
+
+    def drawPaletteImage(self, sector, x, y, w, h, paletteSize):
+        pass  # Not done yet
+
+    def fillScreen(self, rgb):
+        pass  # Not done yet
+
