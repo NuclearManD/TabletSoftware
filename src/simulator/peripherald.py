@@ -89,17 +89,21 @@ class PeripheraldEmulator:
     # Input class callback
     def onDragStartCB(self, evt):
         z = 500
+        x = evt.x // self.scale
+        y = evt.y // self.scale
         self.output_buffer += bytes([EVENT_ON_CTP_CHANGE, 1,
-                                  evt.x >> 8, evt.x & 255,
-                                  evt.y >> 8, evt.y & 255,
+                                  x >> 8, x & 255,
+                                  y >> 8, y & 255,
                                   z >> 8, z & 255,
                               ])
 
     def onDragPointCB(self, evt):
         z = 500
+        x = evt.x // self.scale
+        y = evt.y // self.scale
         self.output_buffer += bytes([EVENT_ON_CTP_CHANGE, 1,
-                                  evt.x >> 8, evt.x & 255,
-                                  evt.y >> 8, evt.y & 255,
+                                  x >> 8, x & 255,
+                                  y >> 8, y & 255,
                                   z >> 8, z & 255,
                               ])
 

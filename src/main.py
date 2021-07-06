@@ -1,5 +1,6 @@
 
 from utils import platform, stdio_stream, protocol
+import time
 
 is_real_tablet = platform.is_real_tablet()
 
@@ -17,4 +18,11 @@ else:
     stream = stdio_stream.StdIOStream()
 
 tablet = protocol.TabletInterface(stream)
+display = tablet.getDisplay()
 
+while True:
+    time.sleep(0.010)
+    for point in tablet.getPresses():
+        x = point[0]
+        y = point[1]
+        display.drawPixel(x, y, 0xFFFFFF)

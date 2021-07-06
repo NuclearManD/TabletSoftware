@@ -55,6 +55,11 @@ class TabletInterface:
             vibe = 0
         self._sendBytes(COMMAND_SET_VIBRATE, vibe)
 
+    def getPresses(self):
+        '''Use this over the presses field so the data gets updated.'''
+        self._update()
+        return self.presses
+
     def _sendBytes(self, *li):
         self.stream.write(bytes(li))
 
