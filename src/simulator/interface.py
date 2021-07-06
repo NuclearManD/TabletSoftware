@@ -1,6 +1,11 @@
 
 import tkinter as tk
 import time, _thread
+
+#memes
+import colorsys
+import random
+
 from .input import Input
 
 class TabletEPaperDisplay:
@@ -15,6 +20,11 @@ class TabletEPaperDisplay:
         self.inputHandler = Input(self)
         self.tabletHardware = tabletHardware
         self.bg = 0
+
+        #memes
+        
+        self.Ombre=[0.0,0.0,0.0]
+        
 
         _thread.start_new_thread(self.mainloop, ())
 
@@ -34,18 +44,39 @@ class TabletEPaperDisplay:
 
         # add to window and show
         self.root.mainloop()
+    
+    def setPixel(self, x, y, color):
 
-    def setPixel(self, x, y, color=1):
+        #memes
+        
+        self.Ombre[0]+=0.001
+        if self.Ombre[0] >= 1:
+            self.Ombre[0]=0
+        ombreRGB = colorsys.hsv_to_rgb(self.Ombre[0], 1, 1)
+        color=self.ombreRGBtocolor(ombreRGB)
+        
+        
         s = self.scale
         x *= s
         y *= s
-        self.canvas.create_rectangle(x, y, x+s-1, y+s-1)
+        self.canvas.create_rectangle(x, y, x+s-1, y+s-1, fill=color,outline=color)
+
+    #memes
+    
+    def ombreRGBtocolor(self, ombreRGB):
+        color = "#"
+        for rgb in ombreRGB:
+            if rgb*255<16:
+                color+="0"
+            color+=format(int(rgb*255), 'x')
+        return color
+    
 
     # Input class callback
     def onDragStartCB(self,x,y):
         pass
     def onDragPointCB(self,x,y):
-        self.tabletHardware.display.setPixel(x, y, 1 - 0)
+        self.tabletHardware.display.setPixel(x, y, '#00ff00')
     def onDragStopCB(self,x,y):
         print("Lifted the pen at", (x, y))
 
