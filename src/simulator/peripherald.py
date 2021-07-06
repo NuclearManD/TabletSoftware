@@ -87,12 +87,24 @@ class PeripheraldEmulator:
             self.canvas.create_line(x, y, x + 1, y, fill=rgb_str)
 
     # Input class callback
-    def onDragStartCB(self,x,y):
-        pass
-    def onDragPointCB(self,x,y):
-        pass
-    def onDragStopCB(self,x,y):
-        pass
+    def onDragStartCB(self, evt):
+        z = 500
+        self.output_buffer += bytes([EVENT_ON_CTP_CHANGE, 1,
+                                  evt.x >> 8, evt.x & 255,
+                                  evt.y >> 8, evt.y & 255,
+                                  z >> 8, z & 255,
+                              ])
+
+    def onDragPointCB(self, evt):
+        z = 500
+        self.output_buffer += bytes([EVENT_ON_CTP_CHANGE, 1,
+                                  evt.x >> 8, evt.x & 255,
+                                  evt.y >> 8, evt.y & 255,
+                                  z >> 8, z & 255,
+                              ])
+
+    def onDragStopCB(self, evt):
+        self.output_buffer += bytes([EVENT_ON_CTP_CHANGE, 0])
 
     def write(self, data):
         cmd = data[0]
@@ -108,8 +120,12 @@ class PeripheraldEmulator:
             y = self.text_cursor[1]
             for char in data[2:n + 2]:
                 if char == 10:
+                    # Newline
                     x = 0
                     y += 12
+                elif char == 32:
+                    # Space
+                    x += 8
                 else:
                     ntios_font.draw_char_on_canvas(self, x, y, char, self.text_color)
                     x += 8
@@ -119,7 +135,36 @@ class PeripheraldEmulator:
             rgb = u16_to_rgb((data[1] << 8) | data[2])
             self.text_color = RGBtoStr(rgb)
 
-        
+        elif cmd == COMMAND_FILL_RECT:
+            x1 = (data[1] << 8) | data[2]
+            y1 = (data[3] << 8) | data[4]
+            x2 = (data[5] << 8) | data[6]
+            y2 = (data[7] << 8) | data[8]
+            rgb = u16_to_rgb((data[9] << 9) | data[10])
+            rgb_str = RGBtoStr(rgb)
+            self.canvas.create_rectangle(x1, y1, x2, y2, fill=rgb_str, outline=rgb_str)
+
+        elif cmd == COMMAND_DRAW_RECT:
+            x1 = (data[1] << 8) | data[2]
+            y1 = (data[3] << 8) | data[4]
+            x2 = (data[5] << 8) | data[6]
+            y2 = (data[7] << 8) | data[8]
+            rgb = u16_to_rgb((data[9] << 8) | data[10])
+            rgb_str = RGBtoStr(rgb)
+            self.canvas.create_rectangle(x1, y1, x2, y2, outline=rgb_str)
+
+        elif cmd == COMMAND_DRAW_PIXEL:
+            x = (data[1] << 8) | data[2]
+            y = (data[3] << 8) | data[4]
+            color = (data[5] << 8) | data[6]
+            self.setPixel(x, y, color)
+
+        elif cmd == COMMAND_FILL_DISPLAY:
+            rgb = u16_to_rgb((data[1] << 8) | data[2])
+            rgb_str = RGBtoStr(rgb)
+            xs = self._canvas_width
+            ys = self._canvas_height
+            self.canvas.create_rectangle(0, 0, xs, ys, fill=rgb_str, outline=rgb_str)
 
     def available(self):
         return len(self.output_buffer) > 0
@@ -129,6 +174,3 @@ class PeripheraldEmulator:
         self.output_buffer = b''
         return data
 
-v = PeripheraldEmulator()
-v.write(bytes([COMMAND_WRITE_TEXT, 5]) + b'hello')
-#v.canvas.create_rectangle(0, 12, 8*5, 24, fill="#EEEEFF", outline="#EEEEFF")
