@@ -1,4 +1,5 @@
 
+import math
 
 COMMAND_SET_TEXT_CURSOR    = 0x01
 COMMAND_WRITE_TEXT         = 0x02
@@ -120,19 +121,42 @@ class TabletDisplay:
         self.iface._sendBytes(COMMAND_DRAW_BITMAP)
 
     def drawPixel(self, x, y, rgb):
-        pass  # Not done yet
+        c = rgb_to_u16(rgb)
+        self.iface._sendBytes(COMMAND_DRAW_PIXEL, x >> 8, x & 255, y >> 8, y & 255, c >> 8, c & 255)
 
     def fillRect(self, x, y, w, h, rgb):
-        pass  # Not done yet
+        c = rgb_to_u16(rgb)
+        x2 = x + w
+        y2 = y + h
+        self.iface._sendBytes(
+            COMMAND_FILL_RECT,
+            x >> 8, x & 255, y >> 8, y & 255,
+            x2 >> 8, x2 & 255, y2 >> 8, y2 & 255,
+            c >> 8, c & 255
+        )
 
     def drawRect(self, x, y, w, h, rgb):
-        pass  # Not done yet
+        c = rgb_to_u16(rgb)
+        x2 = x + w
+        y2 = y + h
+        self.iface._sendBytes(
+            COMMAND_DRAW_RECT,
+            x >> 8, x & 255, y >> 8, y & 255,
+            x2 >> 8, x2 & 255, y2 >> 8, y2 & 255,
+            c >> 8, c & 255
+        )
 
     def writeText(self, text):
-        pass  # Not done yet
+        for i in range(math.ceil(len(text) / 255)):
+            s = text[i*255: i*255 + 255].encode()
+            self.iface._sendBytes(COMMAND_WRITE_TEXT, len(s), *s)
 
     def setCursor(self, x, y):
-        pass  # Not done yet
+        self.iface._sendBytes(
+            COMMAND_SET_TEXT_CURSOR,
+            x >> 8, x & 255,
+            y >> 8, y & 255
+        )
 
     def writeVRAM(self, sector, data):
         if type(data) != bytes:
@@ -152,5 +176,9 @@ class TabletDisplay:
         pass  # Not done yet
 
     def fillScreen(self, rgb):
-        pass  # Not done yet
+        color = rgb_to_u16(rgb)
+        self.iface._sendBytes(
+            COMMAND_FILL_DISPLAY,
+            color >> 8, color & 255
+        )
 
