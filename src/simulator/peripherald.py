@@ -1,7 +1,7 @@
 
 import tkinter as tk
 import time, _thread
-import ntios_font
+from . import ntios_font
 #from .input import Input
 
 COMMAND_SET_TEXT_CURSOR    = 0x01

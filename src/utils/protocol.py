@@ -39,7 +39,7 @@ class TabletInterface:
         self.lastBatteryVoltage = None
         self.lastBatteryCurrent = None
         self.presses = []
-        self._input_buffer
+        self._input_buffer = b''
 
     def getDisplay(self, index = 0):
         return TabletDisplay(self)
