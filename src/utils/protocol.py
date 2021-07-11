@@ -168,17 +168,29 @@ class TabletDisplay:
             raise TypeError("Need a bytes object, not " + str(type(data)))
         if len(data) != 512:
             raise ValueError(f"Wrong data size: {len(data)} (expected 512 bytes)")
-        pass  # Not done yet
+
+        li = []
+        for i in data:
+            li.append(i >> 8)
+            li.append(i & 255)
+
+        self.iface._sendBytes(COMMAND_WRITE_VRAM, sector >> 8, sector & 255, *li)
 
     def drawLoadedBitmap(self, sector, x, y, w, h):
-        pass  # Not done yet
+        self.iface._sendBytes(COMMAND_DRAW_BITMAP, sector >> 8, sector & 255,
+                              x >> 8, x & 255,
+                              y >> 8, y & 255,
+                              w, h)
 
     def drawImage(self, image):
         # This will be a "smart function" that handles VRAM allocation, caching, and drawing automatically.
         pass  # Not done yet
 
     def drawPaletteImage(self, sector, x, y, w, h, paletteSize):
-        pass  # Not done yet
+        self.iface._sendBytes(COMMAND_DRAW_PALETTE_IMAGE, sector >> 8, sector & 255,
+                              x >> 8, x & 255,
+                              y >> 8, y & 255,
+                              w, h, paletteSize)
 
     def fillScreen(self, rgb):
         color = rgb_to_u16(rgb)
