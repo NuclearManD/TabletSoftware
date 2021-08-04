@@ -158,10 +158,35 @@ static inline int do_peripherald_login() {
   return 0;
 }
 
-static void peripherald_run_command(const char* command) {
+static void peripherald_run_command(const char* command, long print_wait_time = 0) {
+  delay(10);
+
   pi_serial->print(command);
   pi_serial->write('\n');
-  
+
+  if (print_wait_time > 0) {
+    debug("Sent command: %s\n", command);
+    char buffer[128];
+    int i = 0;
+
+    print_wait_time += millis();
+    while (print_wait_time < millis()) {
+      if (pi_serial->available()) {
+        char c = pi_serial->available();
+        if (c == '\n' || c == '\r') {
+          pi_serial->write(buffer, i);
+          i = 0;
+        } else if (i >= sizeof(buffer)) {
+          pi_serial->write(buffer, i);
+          i = 0;
+          buffer[i++] = c;
+        } else
+          buffer[i++] = c;
+      }
+    }
+  }
+
+  delay(10);
 }
 
 static void loading_swirl_thread(void* arg) {
@@ -262,14 +287,14 @@ void peripherald(void* arg) {
     return;
   }
 
-  // Start the main program
-  peripherald_run_command("cd ~/firmware/");
-  peripherald_run_command("python3 main.py");
-
   // Say that we stopped loading
   _is_peripherald_loading = false;
   builtin_display->clearScreen(0x0000);
   builtin_display->println("Starting UI...");
+
+  // Start the main program
+  peripherald_run_command("cd ~/firmware/");
+  peripherald_run_command("python3 main.py");
 
   // Here we would start the peripheral protocol handling stuff
   int i = 0;
@@ -284,8 +309,11 @@ void peripherald(void* arg) {
     }
 
     // Read in the data
-    while (pi_serial->available())
-      _peripherald_serial_buffer[i++] = pi_serial->read();
+    while (pi_serial->available()) {
+      char c = pi_serial->read();
+      _peripherald_serial_buffer[i++] = c;
+      debug("Got 0x%02hhx\n", c);
+    }
 
     // Process input
     int bytes_used = process_gpu_commands(_peripherald_serial_buffer, i);

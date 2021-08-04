@@ -73,7 +73,7 @@ void _launch_wrapper(void* raw) {
 }
 
 void ntios_shell_wrapper(void* io) {
-  ntios_shell((StreamDevice*)io, _password_hash);
+  ntios_shell((StreamDevice*)io); //, _password_hash);
   on_killed_thread(threads.id());
 }
 
@@ -431,7 +431,7 @@ void setup() {
   threads.setSliceMicros(10000);
 
   start_hw();
-  start_peripherald();
+  //start_peripherald();
 
   // Really this is just a debug port.  That's why I added the login,
   // I don't want a bad actor with hardware access to be able to execute
