@@ -20,6 +20,8 @@ else:
 tablet = protocol.TabletInterface(stream)
 display = tablet.getDisplay()
 
+display.fillScreen(0x202020)
+
 while True:
     time.sleep(0.010)
     for point in tablet.getPresses():
