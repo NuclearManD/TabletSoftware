@@ -140,19 +140,19 @@ class PeripheraldEmulator:
             self.text_color = RGBtoStr(rgb)
 
         elif cmd == COMMAND_FILL_RECT:
-            x1 = (data[1] << 8) | data[2]
-            y1 = (data[3] << 8) | data[4]
-            x2 = (data[5] << 8) | data[6]
-            y2 = (data[7] << 8) | data[8]
+            x1 = ((data[1] << 8) | data[2]) * self.scale
+            y1 = ((data[3] << 8) | data[4]) * self.scale
+            x2 = ((data[5] << 8) | data[6]) * self.scale
+            y2 = ((data[7] << 8) | data[8]) * self.scale
             rgb = u16_to_rgb((data[9] << 9) | data[10])
             rgb_str = RGBtoStr(rgb)
             self.canvas.create_rectangle(x1, y1, x2, y2, fill=rgb_str, outline=rgb_str)
 
         elif cmd == COMMAND_DRAW_RECT:
-            x1 = (data[1] << 8) | data[2]
-            y1 = (data[3] << 8) | data[4]
-            x2 = (data[5] << 8) | data[6]
-            y2 = (data[7] << 8) | data[8]
+            x1 = ((data[1] << 8) | data[2]) * self.scale
+            y1 = ((data[3] << 8) | data[4]) * self.scale
+            x2 = ((data[5] << 8) | data[6]) * self.scale
+            y2 = ((data[7] << 8) | data[8]) * self.scale
             rgb = u16_to_rgb((data[9] << 8) | data[10])
             rgb_str = RGBtoStr(rgb)
             self.canvas.create_rectangle(x1, y1, x2, y2, outline=rgb_str)
