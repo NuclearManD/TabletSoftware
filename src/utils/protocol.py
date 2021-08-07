@@ -164,15 +164,18 @@ class TabletDisplay:
         )
 
     def writeVRAM(self, sector, data):
-        if type(data) != bytes:
-            raise TypeError("Need a bytes object, not " + str(type(data)))
-        if len(data) != 512:
-            raise ValueError(f"Wrong data size: {len(data)} (expected 512 bytes)")
+        if type(data) != list:
+            raise TypeError("Need a list of 16-bit integers, not " + str(type(data)))
+        if len(data) > 256:
+            raise ValueError(f"Wrong data size: {len(data)} (expected <= 256 16-bit words)")
 
         li = []
         for i in data:
             li.append(i >> 8)
             li.append(i & 255)
+
+        if len(li) < 512:
+            li += [0] * (512 - len(li))
 
         self.iface._sendBytes(COMMAND_WRITE_VRAM, sector >> 8, sector & 255, *li)
 
@@ -182,9 +185,28 @@ class TabletDisplay:
                               y >> 8, y & 255,
                               w, h)
 
-    def drawImage(self, image):
-        # This will be a "smart function" that handles VRAM allocation, caching, and drawing automatically.
-        pass  # Not done yet
+    def drawImage(self, xp, yp, image):
+        xs = image.width
+        ys = image.height
+
+        # We could use multiple draws to do large images later
+        if xs > 255 or ys > 255:
+            raise ValueError("Image must be within 256x256 pixels")
+
+        # We could cache this too, and that would be better
+        # Load up the image data
+        bitmap_data = []
+        for y in range(ys):
+            for x in range(xs):
+                color = image.getpixel((x, y))
+                u16 = rgb_to_u16(color)
+                bitmap_data.append(u16)
+
+        for i in range(math.ceil(xs * ys / 256)):
+            self.writeVRAM(i, bitmap_data[i*256:(i+1)*256])
+
+        # Draw the image
+        self.drawLoadedBitmap(0, xp, yp, xs, ys)
 
     def drawPaletteImage(self, sector, x, y, w, h, paletteSize):
         self.iface._sendBytes(COMMAND_DRAW_PALETTE_IMAGE, sector >> 8, sector & 255,
@@ -198,4 +220,12 @@ class TabletDisplay:
             COMMAND_FILL_DISPLAY,
             color >> 8, color & 255
         )
+
+    def getWidth(self):
+        # TODO: Make this a real protocol/api thing
+        return 800
+
+    def getHeight(self):
+        # TODO: Make this a real protocol/api thing
+        return 480
 

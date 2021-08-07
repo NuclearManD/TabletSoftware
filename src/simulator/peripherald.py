@@ -38,7 +38,7 @@ def RGBtoStr(ombreRGB):
     return color
 
 class PeripheraldEmulator:
-    def __init__(self, screen_res = (800, 480), scale = 1):
+    def __init__(self, screen_res = (800, 480), scale = 1, vram_sectors=1024):
         if type(scale) != int:
             raise ValueError("scale parameter must be an integer")
 
@@ -49,6 +49,7 @@ class PeripheraldEmulator:
         self.output_buffer = b''
         self.text_cursor = (0, 0)
         self.text_color = '#FFFFFF'
+        self.vram = [0] * (vram_sectors * 256)
 
         _thread.start_new_thread(self.mainloop, ())
 
@@ -113,6 +114,10 @@ class PeripheraldEmulator:
     def write(self, data):
         cmd = data[0]
 
+        # Simulate the time delay
+        print(f"Delay: {len(data) / 11.520}ms")
+        time.sleep(len(data) / 11520)
+
         if cmd == COMMAND_SET_TEXT_CURSOR:
             x = (data[1] << 8) | data[2]
             y = (data[3] << 8) | data[4]
@@ -133,7 +138,6 @@ class PeripheraldEmulator:
                 else:
                     ntios_font.draw_char_on_canvas(self, x, y, char, self.text_color)
                     x += 8
-                
 
         elif cmd == COMMAND_SET_TEXT_COLOR:
             rgb = u16_to_rgb((data[1] << 8) | data[2])
@@ -170,8 +174,29 @@ class PeripheraldEmulator:
             ys = self._canvas_height
             self.canvas.create_rectangle(0, 0, xs, ys, fill=rgb_str, outline=rgb_str)
 
+        elif cmd == COMMAND_WRITE_VRAM:
+            first_word = ((data[1] << 8) | data[2]) * 256
+
+            # Read a sector into VRAM
+            for i in range(256):
+                self.vram[first_word + i] = (data[i*2 + 1] << 8) | data[i*2 + 2]
+
+        elif cmd == COMMAND_DRAW_BITMAP:
+            first_word = ((data[1] << 8) | data[2]) * 256
+            x = ((data[3] << 8) | data[4]) * self.scale
+            y = ((data[5] << 8) | data[6]) * self.scale
+            width = data[7]
+            height = data[8]
+            self.drawBitmap16(x, y, width, height, first_word)
+
     def available(self):
         return len(self.output_buffer) > 0
+
+    def drawBitmap16(self, xp, yp, width, height, first_word):
+        for x in range(width):
+            for y in range(height):
+                color = self.vram[first_word + x + y * width]
+                self.setPixel(x + xp, y + yp, color)
 
     def read(self):
         data = self.output_buffer
