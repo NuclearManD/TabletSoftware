@@ -2,6 +2,7 @@
 import tkinter as tk
 import time, _thread
 from . import ntios_font
+from PIL import ImageTk, Image, ImageDraw
 #from .input import Input
 
 COMMAND_SET_TEXT_CURSOR    = 0x01
@@ -50,6 +51,7 @@ class PeripheraldEmulator:
         self.text_cursor = (0, 0)
         self.text_color = '#FFFFFF'
         self.vram = [0] * (vram_sectors * 256)
+        self.imcache = []
 
         _thread.start_new_thread(self.mainloop, ())
 
@@ -174,6 +176,9 @@ class PeripheraldEmulator:
             ys = self._canvas_height
             self.canvas.create_rectangle(0, 0, xs, ys, fill=rgb_str, outline=rgb_str)
 
+            # No images left, clear the image cache
+            self.imcache = []
+
         elif cmd == COMMAND_WRITE_VRAM:
             first_word = ((data[1] << 8) | data[2]) * 256
 
@@ -193,10 +198,19 @@ class PeripheraldEmulator:
         return len(self.output_buffer) > 0
 
     def drawBitmap16(self, xp, yp, width, height, first_word):
-        for x in range(width):
-            for y in range(height):
-                color = self.vram[first_word + x + y * width]
-                self.setPixel(x + xp, y + yp, color)
+
+        # Create Image
+        pilImage = Image.new(mode="RGB", size=(width, height))
+        for y in range(height):
+            for x in range(width):
+                color = u16_to_rgb(self.vram[first_word + x + y*width])
+                pilImage.putpixel((x, y), color)
+
+        pilImage = pilImage.resize((width * self.scale, height * self.scale))
+
+        # Apply to Canvas
+        self.imcache.append(ImageTk.PhotoImage(pilImage))
+        self.canvas.create_image((xp, yp), image=self.imcache[-1], anchor='nw')
 
     def read(self):
         data = self.output_buffer
