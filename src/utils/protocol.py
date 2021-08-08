@@ -116,10 +116,86 @@ class TabletInterface:
             self._input_buffer = self._input_buffer[sz:]
 
 
+class VRAMObject:
+    def __init__(self, first_sector, num_sectors, value):
+        self.first_sector = first_sector
+        self.num_sectors = num_sectors
+        self.last_sector = first_sector + num_sectors - 1
+        self.value = value
+        self.num_accesses = 1
+
+
+class VRAMCache:
+    def __init__(self, total_sectors):
+        self.items = []
+        self.total_sectors = total_sectors
+
+    def getSectorOf(self, value):
+        for i in self.items:
+            if i.value == value:
+                i.num_accesses += 1
+                return i.first_sector
+
+        return None
+
+    def getItemInSector(self, sector):
+        for i in self.items:
+            if sector >= i.first_sector and sector <= i.last_sector:
+                return i
+
+        return None
+
+    def getItemsInSectors(self, first, last):
+        found = []
+        for i in self.items:
+            if last >= i.first_sector and first <= i.last_sector:
+                found.append(i)
+
+        return found
+
+    def addItem(self, first_sector, num_sectors, value):
+        item = VRAMObject(first_sector, num_sectors, value)
+
+        # Remove things that were overwritten
+        items_overwritten = self.getItemsInSectors(item.first_sector, item.last_sector)
+        for i in items_overwritten:
+            self.items.remove(i)
+
+        self.items.append(item)
+
+    def getFreeChunk(self, size):
+        proposed_start = 0
+        end = proposed_start + size - 1
+        i = 0
+        while i < len(self.items):
+            if end >= self.items[i].first_sector:
+                # Recompute proposed start
+                proposed_start = self.items[i].last_sector + 1
+                end = proposed_start + size - 1
+
+                # Check if we're out of VRAM
+                if end >= self.total_sectors:
+                    return None
+
+                # Reset item iterator
+                i = 0
+            else:
+                # Check the next item
+                i += 1
+
+        return proposed_start
+
+    def getBestChunk(self, size):
+        # TODO: Implement this
+        return 0
+        
+
+
 class TabletDisplay:
 
     def __init__(self, iface):
         self.iface = iface
+        self.vram_cache = VRAMCache(1024)
 
     def setTextColor(self, rgb):
         color = rgb_to_u16(rgb)
@@ -193,20 +269,32 @@ class TabletDisplay:
         if xs > 255 or ys > 255:
             raise ValueError("Image must be within 256x256 pixels")
 
-        # We could cache this too, and that would be better
-        # Load up the image data
-        bitmap_data = []
-        for y in range(ys):
-            for x in range(xs):
-                color = image.getpixel((x, y))
-                u16 = rgb_to_u16(color)
-                bitmap_data.append(u16)
+        # Try to find the image in the cache
+        start_sector = self.vram_cache.getSectorOf(image)
 
-        for i in range(math.ceil(xs * ys / 256)):
-            self.writeVRAM(i, bitmap_data[i*256:(i+1)*256])
+        if start_sector is None:
+            num_sectors = math.ceil(xs * ys / 256)
+            start_sector = self.vram_cache.getFreeChunk(num_sectors)
+
+            if start_sector is None:
+                # No free space of the requested size
+                start_sector = self.vram_cache.getBestChunk(num_sectors)
+
+            # Load up the image data because it's not cached
+            bitmap_data = []
+            for y in range(ys):
+                for x in range(xs):
+                    color = image.getpixel((x, y))
+                    u16 = rgb_to_u16(color)
+                    bitmap_data.append(u16)
+
+            for i in range(num_sectors):
+                self.writeVRAM(i, bitmap_data[i*256:(i+1)*256])
+
+            self.vram_cache.addItem(start_sector, math.ceil(xs * ys / 256), image)
 
         # Draw the image
-        self.drawLoadedBitmap(0, xp, yp, xs, ys)
+        self.drawLoadedBitmap(start_sector, xp, yp, xs, ys)
 
     def drawPaletteImage(self, sector, x, y, w, h, paletteSize):
         self.iface._sendBytes(COMMAND_DRAW_PALETTE_IMAGE, sector >> 8, sector & 255,
