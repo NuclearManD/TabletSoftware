@@ -20,7 +20,7 @@ EVENT_ON_KEYPRESS   = 0x03
 
 
 def rgb_to_u16(rgb):
-    if type(rgb) == tuple:
+    if type(rgb) == tuple or type(rgb) == list:
         red = rgb[0]
         green = rgb[1]
         blue = rgb[2]
@@ -168,7 +168,7 @@ class VRAMCache:
         end = proposed_start + size - 1
         i = 0
         while i < len(self.items):
-            if end >= self.items[i].first_sector:
+            if end >= self.items[i].first_sector and proposed_start <= self.items[i].last_sector:
                 # Recompute proposed start
                 proposed_start = self.items[i].last_sector + 1
                 end = proposed_start + size - 1
@@ -255,6 +255,54 @@ class TabletDisplay:
 
         self.iface._sendBytes(COMMAND_WRITE_VRAM, sector >> 8, sector & 255, *li)
 
+    def loadBitmap(self, start_sector, image):
+        xs = image.width
+        ys = image.height
+
+        # Load up the image data because it's not cached
+        bitmap_data = []
+        for y in range(ys):
+            for x in range(xs):
+                color = image.getpixel((x, y))
+                u16 = rgb_to_u16(color)
+                bitmap_data.append(u16)
+
+        num_sectors = math.ceil(xs * ys / 256)
+        for i in range(num_sectors):
+            self.writeVRAM(start_sector + i, bitmap_data[i*256:(i+1)*256])
+
+        self.vram_cache.addItem(start_sector, math.ceil(xs * ys / 256), image)
+
+    def loadPaletteImage(self, start_sector, image):
+        xs = image.width
+        ys = image.height
+
+        bitmap_data = []
+
+        # Get color data first
+        color_data = image.getpalette()
+        n_colors = len(image.getcolors())
+        for i in range(n_colors):
+            rgb = color_data[i*3:i*3 + 3]
+            print(i, rgb)
+            bitmap_data.append(rgb_to_u16(rgb))
+
+        print(bitmap_data[:16])
+        # Now the pixel data
+        for y in range(ys):
+            for x in range(0, xs, 4):
+                p0 = image.getpixel((x + 0, y))
+                p1 = image.getpixel((x + 1, y))
+                p2 = image.getpixel((x + 2, y))
+                p3 = image.getpixel((x + 3, y))
+                bitmap_data.append((p0 << 12) | (p1 << 8) | (p2 << 4) | p3)
+
+        num_sectors = math.ceil((xs * ys / 4 + n_colors) / 256)
+        for i in range(num_sectors):
+            self.writeVRAM(start_sector + i, bitmap_data[i*256:(i+1)*256])
+
+        self.vram_cache.addItem(start_sector, math.ceil(xs * ys / 256), image)
+
     def drawLoadedBitmap(self, sector, x, y, w, h):
         self.iface._sendBytes(COMMAND_DRAW_BITMAP, sector >> 8, sector & 255,
                               x >> 8, x & 255,
@@ -264,6 +312,7 @@ class TabletDisplay:
     def drawImage(self, xp, yp, image):
         xs = image.width
         ys = image.height
+        is_palette_image = image.mode == 'P' and (len(image.getcolors()) <= 16)
 
         # We could use multiple draws to do large images later
         if xs > 255 or ys > 255:
@@ -273,7 +322,10 @@ class TabletDisplay:
         start_sector = self.vram_cache.getSectorOf(image)
 
         if start_sector is None:
-            num_sectors = math.ceil(xs * ys / 256)
+            if is_palette_image:
+                num_sectors = math.ceil((xs * ys / 4 + 16) / 256)
+            else:
+                num_sectors = math.ceil(xs * ys / 256)
             start_sector = self.vram_cache.getFreeChunk(num_sectors)
 
             if start_sector is None:
@@ -281,20 +333,16 @@ class TabletDisplay:
                 start_sector = self.vram_cache.getBestChunk(num_sectors)
 
             # Load up the image data because it's not cached
-            bitmap_data = []
-            for y in range(ys):
-                for x in range(xs):
-                    color = image.getpixel((x, y))
-                    u16 = rgb_to_u16(color)
-                    bitmap_data.append(u16)
-
-            for i in range(num_sectors):
-                self.writeVRAM(i, bitmap_data[i*256:(i+1)*256])
-
-            self.vram_cache.addItem(start_sector, math.ceil(xs * ys / 256), image)
+            if is_palette_image:
+                self.loadPaletteImage(start_sector, image)
+            else:
+                self.loadBitmap(start_sector, image)
 
         # Draw the image
-        self.drawLoadedBitmap(start_sector, xp, yp, xs, ys)
+        if is_palette_image:
+            self.drawPaletteImage(start_sector, xp, yp, xs, ys, len(image.getcolors()))
+        else:
+            self.drawLoadedBitmap(start_sector, xp, yp, xs, ys)
 
     def drawPaletteImage(self, sector, x, y, w, h, paletteSize):
         self.iface._sendBytes(COMMAND_DRAW_PALETTE_IMAGE, sector >> 8, sector & 255,

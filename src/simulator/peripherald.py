@@ -117,7 +117,7 @@ class PeripheraldEmulator:
         cmd = data[0]
 
         # Simulate the time delay
-        print(f"Delay: {len(data) / 11.520}ms")
+        #print(f"Delay: {len(data) / 11.520}ms")
         time.sleep(len(data) / 11520)
 
         if cmd == COMMAND_SET_TEXT_CURSOR:
@@ -184,7 +184,7 @@ class PeripheraldEmulator:
 
             # Read a sector into VRAM
             for i in range(256):
-                self.vram[first_word + i] = (data[i*2 + 1] << 8) | data[i*2 + 2]
+                self.vram[first_word + i] = (data[i*2 + 3] << 8) | data[i*2 + 4]
 
         elif cmd == COMMAND_DRAW_BITMAP:
             first_word = ((data[1] << 8) | data[2]) * 256
@@ -193,6 +193,15 @@ class PeripheraldEmulator:
             width = data[7]
             height = data[8]
             self.drawBitmap16(x, y, width, height, first_word)
+
+        elif cmd == COMMAND_DRAW_PALETTE_IMAGE:
+            first_word = ((data[1] << 8) | data[2]) * 256
+            x = ((data[3] << 8) | data[4]) * self.scale
+            y = ((data[5] << 8) | data[6]) * self.scale
+            width = data[7]
+            height = data[8]
+            n_colors = data[9]
+            self.drawPaletteImage(x, y, width, height, first_word, n_colors)
 
     def available(self):
         return len(self.output_buffer) > 0
@@ -205,6 +214,30 @@ class PeripheraldEmulator:
             for x in range(width):
                 color = u16_to_rgb(self.vram[first_word + x + y*width])
                 pilImage.putpixel((x, y), color)
+
+        pilImage = pilImage.resize((width * self.scale, height * self.scale))
+
+        # Apply to Canvas
+        self.imcache.append(ImageTk.PhotoImage(pilImage))
+        self.canvas.create_image((xp, yp), image=self.imcache[-1], anchor='nw')
+
+    def drawPaletteImage(self, xp, yp, width, height, first_word, n_colors):
+
+        # Create Image
+        pilImage = Image.new(mode="P", size=(width, height))
+        palette = []
+        print(self.vram[first_word:first_word + 32])
+        for i in range(n_colors):
+            print(i, u16_to_rgb(self.vram[first_word + i]))
+            palette += u16_to_rgb(self.vram[first_word + i])
+        pilImage.putpalette(palette + [0]*(768 - len(palette)))
+        for y in range(height):
+            for x in range(0, width, 4):
+                pixel_data = self.vram[n_colors + first_word + ((x + y*width) // 4)]
+                pilImage.putpixel((x + 0, y), (pixel_data >> 12) & 15)
+                pilImage.putpixel((x + 1, y), (pixel_data >> 8) & 15)
+                pilImage.putpixel((x + 2, y), (pixel_data >> 4) & 15)
+                pilImage.putpixel((x + 3, y), (pixel_data >> 0) & 15)
 
         pilImage = pilImage.resize((width * self.scale, height * self.scale))
 
