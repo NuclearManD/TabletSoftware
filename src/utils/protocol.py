@@ -309,14 +309,10 @@ class TabletDisplay:
                               y >> 8, y & 255,
                               w, h)
 
-    def drawImage(self, xp, yp, image):
+    def loadImage(self, image):
         xs = image.width
         ys = image.height
         is_palette_image = image.mode == 'P' and (len(image.getcolors()) <= 16)
-
-        # We could use multiple draws to do large images later
-        if xs > 255 or ys > 255:
-            raise ValueError("Image must be within 256x256 pixels")
 
         # Try to find the image in the cache
         start_sector = self.vram_cache.getSectorOf(image)
@@ -337,6 +333,19 @@ class TabletDisplay:
                 self.loadPaletteImage(start_sector, image)
             else:
                 self.loadBitmap(start_sector, image)
+
+        return start_sector
+
+    def drawImage(self, xp, yp, image):
+        xs = image.width
+        ys = image.height
+        is_palette_image = image.mode == 'P' and (len(image.getcolors()) <= 16)
+
+        # We could use multiple draws to do large images later
+        if xs > 255 or ys > 255:
+            raise ValueError("Image must be within 256x256 pixels")
+
+        start_sector = self.loadImage(image)
 
         # Draw the image
         if is_palette_image:
