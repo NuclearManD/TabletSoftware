@@ -284,10 +284,8 @@ class TabletDisplay:
         n_colors = len(image.getcolors())
         for i in range(n_colors):
             rgb = color_data[i*3:i*3 + 3]
-            print(i, rgb)
             bitmap_data.append(rgb_to_u16(rgb))
 
-        print(bitmap_data[:16])
         # Now the pixel data
         for y in range(ys):
             for x in range(0, xs, 4):

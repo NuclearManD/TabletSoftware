@@ -226,9 +226,7 @@ class PeripheraldEmulator:
         # Create Image
         pilImage = Image.new(mode="P", size=(width, height))
         palette = []
-        print(self.vram[first_word:first_word + 32])
         for i in range(n_colors):
-            print(i, u16_to_rgb(self.vram[first_word + i]))
             palette += u16_to_rgb(self.vram[first_word + i])
         pilImage.putpalette(palette + [0]*(768 - len(palette)))
         for y in range(height):
