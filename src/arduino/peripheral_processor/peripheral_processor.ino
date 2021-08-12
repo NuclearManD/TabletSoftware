@@ -192,7 +192,7 @@ void bootloader_delay(long milliseconds) {
 /*
  * External variables for hacking interrupts
  */
-extern void (* _VectorsRam[NVIC_NUM_INTERRUPTS+16])(void);
+//extern void (* _VectorsRam[NVIC_NUM_INTERRUPTS+16])(void);
 extern void unused_interrupt_vector(void);
 
 
@@ -280,8 +280,8 @@ void custom_HardFault_HandlerC(unsigned int *hardfault_args)
 
   asm volatile("mrs %0, ipsr\n" : "=r" (addr)::);
   Serial.printf("\nFaulted thread ID: %i", threads.id());
-  Serial.printf("\nFaulted thread stack pointer: %p", threads.threadp[threads.id()]->sp);
-  Serial.printf("\nFaulted thread stack base:    %p\n", threads.threadp[threads.id()]->stack);
+  //Serial.printf("\nFaulted thread stack pointer: %p", threads.threadp[threads.id()]->sp);
+  //Serial.printf("\nFaulted thread stack base:    %p\n", threads.threadp[threads.id()]->stack);
   Serial.printf("\nFault irq %d\n", addr & 0x1FF);
   Serial.printf(" stacked_r0 ::  %x\n", stacked_r0);
   Serial.printf(" stacked_r1 ::  %x\n", stacked_r1);

@@ -73,12 +73,12 @@ int builtin_system(int argc, char** argv, StreamDevice* io) {
     io->printf("Total CPU usage %.2f%%.  Collecting data...\n", get_cpu_usage_percent());
 
     uint32_t total_cycles[num_threads];
-    for (int i = 0; i < num_threads; i++)
+    /*for (int i = 0; i < num_threads; i++)
       total_cycles[i] = threads.getCyclesUsed(thread_pids[i]);
     threads.delay(1000);
     for (int i = 0; i < num_threads; i++)
       total_cycles[i] = threads.getCyclesUsed(thread_pids[i]) - total_cycles[i];
-      
+      */
     io->println( "  PID  Name                            Usage %");
     for (int i = 0; i < num_threads; i++) {
       int pid = thread_pids[i];
