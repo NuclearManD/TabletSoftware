@@ -278,23 +278,30 @@ void peripherald(void* arg) {
     peripherald_num_vram_sectors = PERIPHERALD_VRAM_SIZE / 512;
   }
 
+  while (pi_serial->available())
+    pi_serial->read();
+
   display_bootup_screen();
 
-  peripherald_wait_companion_boot();
+  /*peripherald_wait_companion_boot();
 
   if (do_peripherald_login() != 0) {
     debug("Login failure: Exiting peripheral.d\n");
     return;
-  }
+  }*/
 
   // Say that we stopped loading
-  _is_peripherald_loading = false;
+  /*_is_peripherald_loading = false;
   builtin_display->clearScreen(0x0000);
   builtin_display->println("Starting UI...");
 
   // Start the main program
   peripherald_run_command("cd ~/firmware/");
-  peripherald_run_command("python3 main.py");
+  peripherald_run_command("python3 main.py");*/
+
+  // Wait until we get something, say we're loading until then
+  while (!pi_serial->available());
+  _is_peripherald_loading = false;
 
   // Here we would start the peripheral protocol handling stuff
   int i = 0;
