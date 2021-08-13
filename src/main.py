@@ -1,6 +1,8 @@
 
-from utils import platform, stdio_stream, protocol
+from utils import platform, stdio_stream, protocol, compression
+import shell
 import time
+from ui import *
 
 is_real_tablet = platform.is_real_tablet()
 
@@ -13,6 +15,8 @@ if not is_real_tablet:
     from simulator import peripherald
 
     stream = peripherald.PeripheraldEmulator(scale = 2)
+    #stream.drawBitmap16(0, 0, 255, 255, 0)
+    #quit()
 
 else:
     stream = stdio_stream.StdIOStream()
@@ -20,11 +24,15 @@ else:
 tablet = protocol.TabletInterface(stream)
 display = tablet.getDisplay()
 
-display.fillScreen(0x202020)
+#display.fillScreen(0x202020)
 
-while True:
-    time.sleep(0.010)
-    for point in tablet.getPresses():
-        x = point[0]
-        y = point[1]
-        display.drawPixel(x, y, 0xFFFFFF)
+from PIL import Image
+
+sys = shell.SystemShell([
+    shell.Application("Paint", None, 0x882297, None),
+    shell.Application("Library", Image.open("../res/library_icon.png"), 0x101070, None)
+])
+
+sys.loadImages(display)
+
+sys.mainloop(tablet)

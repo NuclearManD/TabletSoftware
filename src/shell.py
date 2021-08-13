@@ -65,7 +65,8 @@ class SystemShell:
                         app.main(tablet)
                 except Exception as e:
                     self.drawHome(display)
-                    popup = ErrorPopup(str(e))
+                    popup = ErrorPopupBox(str(e))
                     popup.mainloop(tablet)
-                else:
-                    self.drawHome(display)
+
+                # Re-render the homescreen
+                self.drawHome(display)
