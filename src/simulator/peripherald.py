@@ -24,11 +24,12 @@ EVENT_ON_KEYPRESS   = 0x03
 
 
 def u16_to_rgb(c):
-    red = (c << 3) & 0xFF
+    blue = (c << 3) & 0xFF
     green = (c >> 3) & 0xFC
-    blue = (c >> 8) & 0xF8
+    red = (c >> 8) & 0xF8
 
     return (red, green, blue)
+
 
 def RGBtoStr(ombreRGB):
     color = "#"
@@ -37,6 +38,7 @@ def RGBtoStr(ombreRGB):
             color+="0"
         color+=format(int(rgb), 'x')
     return color
+
 
 class PeripheraldEmulator:
     def __init__(self, screen_res = (800, 480), scale = 1, vram_sectors=1024):

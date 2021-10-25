@@ -29,7 +29,7 @@ def rgb_to_u16(rgb):
         green = (rgb >> 8) & 255
         blue = (rgb >> 16) & 255
 
-    return (red >> 3) | ((green << 3) & 0x7e0) | ((blue << 8) & 0xf800)
+    return (blue >> 3) | ((green << 3) & 0x7e0) | ((red << 8) & 0xf800)
 
 
 class TabletInterface:
