@@ -193,7 +193,7 @@ void bootloader_delay(long milliseconds) {
  * External variables for hacking interrupts
  */
 //extern void (* _VectorsRam[NVIC_NUM_INTERRUPTS+16])(void);
-extern void unused_interrupt_vector(void);
+//extern void unused_interrupt_vector(void);
 
 
 /*
@@ -211,7 +211,7 @@ extern void unused_interrupt_vector(void);
 //  R1
 //  R0
 // Code from :: https://community.nxp.com/thread/389002
-__attribute__((naked))
+/*__attribute__((naked))
 void custom_interrupt_vector(void)
 {
   __asm( ".syntax unified\n"
@@ -280,8 +280,8 @@ void custom_HardFault_HandlerC(unsigned int *hardfault_args)
 
   asm volatile("mrs %0, ipsr\n" : "=r" (addr)::);
   Serial.printf("\nFaulted thread ID: %i", threads.id());
-  //Serial.printf("\nFaulted thread stack pointer: %p", threads.threadp[threads.id()]->sp);
-  //Serial.printf("\nFaulted thread stack base:    %p\n", threads.threadp[threads.id()]->stack);
+  Serial.printf("\nFaulted thread stack pointer: %p", threads.threadp[threads.id()]->sp);
+  Serial.printf("\nFaulted thread stack base:    %p\n", threads.threadp[threads.id()]->stack);
   Serial.printf("\nFault irq %d\n", addr & 0x1FF);
   Serial.printf(" stacked_r0 ::  %x\n", stacked_r0);
   Serial.printf(" stacked_r1 ::  %x\n", stacked_r1);
@@ -311,22 +311,6 @@ void custom_HardFault_HandlerC(unsigned int *hardfault_args)
     }
     Serial.printf("\n");
   }
-  /*ThreadInfo* thread = threads.threadp[threads.id()];
-  unsigned int* thread_stack_top = (unsigned int*)(&(thread->stack[thread->stack_size]));
-  unsigned int* thread_sp = (unsigned int*)(thread->sp);
-  int num_entries = ((unsigned int)thread_stack_top - (unsigned int)thread_sp) / 4;
-  Serial.println("\nThread stack:");
-  for (int i = 0; i < num_entries; i++) {
-    Serial.printf("   0x%08x = 0x%08x", (unsigned int)&(thread_sp[i]), thread_sp[i]);
-    if ((thread_sp[i] & 0xFFF00000) == 0x20000000UL) {
-      Serial.printf(" -> {");
-      for (int j = 0; j < 16; j++) {
-        Serial.printf("0x%hhx, ", ((uint8_t*)thread_sp[i])[j]);
-      }
-      Serial.printf("...");
-    }
-    Serial.printf("\n");
-  }*/
 
   Serial.println();
   Serial.printf(" _CFSR ::  %x\n", _CFSR);
@@ -409,7 +393,7 @@ void custom_HardFault_HandlerC(unsigned int *hardfault_args)
   Serial.flush();
 
   while(1);
-}
+}*/
 
 /*
  * This function sets up the hardware, then launches the OS.
@@ -422,11 +406,11 @@ void setup() {
     delay(1000);
 
   // Hack into the vectors RAM and insert our own interrupts
-  for (int i = 0; i < 16; i++)
+  /*for (int i = 0; i < 16; i++)
     if (i != 15 && i != 14 && i != 11) {
       Serial.printf("Changing IVT entry %i\n", i);
       _VectorsRam[i] = &custom_interrupt_vector;
-    }
+    }*/
 
   threads.setSliceMicros(10000);
 

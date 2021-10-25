@@ -115,25 +115,80 @@ static long wait_for_either(const char* s1, const char* s2) {
   }
 }
 
+static long wait_for_any(const char* s1, const char* s2, const char* s3) {
+  char text_in[32];
+  uint32_t s1_len = strlen(s1);
+  uint32_t s2_len = strlen(s2);
+  uint32_t s3_len = strlen(s3);
+  uint32_t max_str_len = max(max(s1_len, s2_len), s3_len);
+  const char* s1_text_in = &text_in[max_str_len - s1_len];
+  const char* s2_text_in = &text_in[max_str_len - s2_len];
+  const char* s3_text_in = &text_in[max_str_len - s3_len];
+
+  // String to check is too big
+  if (max_str_len > sizeof(text_in))
+    return -100;
+
+  memset(text_in, 0, max_str_len);
+
+  while (true) {
+
+    while (!pi_serial->available())
+      bootloader_yield();
+
+    memmove(text_in, text_in + 1, max_str_len - 1);
+    text_in[max_str_len - 1] = pi_serial->read();
+
+    if (memcmp(s1_text_in, s1, s1_len) == 0)
+      return 0;
+    if (memcmp(s2_text_in, s2, s2_len) == 0)
+      return 1;
+    if (memcmp(s3_text_in, s3, s3_len) == 0)
+      return 2;
+  }
+}
+
 /*
  * This function just waits for the companion processor to boot up.
  */
-static inline void peripherald_wait_companion_boot() {
+static inline int peripherald_wait_companion_boot() {
 
   // If we are already booted, this will force the terminal to give us a prompt
   pi_serial->write('\n');
 
   // Don't care if it just booted or already has a prompt open
-  wait_for_either("start : cron", ":~# ");
+  long index_gotten = wait_for_any("login:", ":~$ ", "(or press Control-D to continue)");
+
+  // If we have a maintanence message just do Ctrl-D and wait again
+  if (index_gotten == 2) {
+    debug("Sending Ctrl-D\n");
+    pi_serial->write(4);
+    index_gotten = wait_for_either("login:", ":~# ");
+  }
   debug("Companion processor booted.\n");
+
+  if (index_gotten == 0) {
+    debug("Attempting login to companion processor\n");
+    pi_serial->print("dietpi\n");
+    bootloader_delay(300);
+    pi_serial->print("XischaC7~\n");
+
+    if (wait_for_string(":~$ ", 5000) < 0) {
+      // Login detect error
+      return -1;
+    }
+  }
+
+  return 0;
 }
+
 
 /*
  * Logs in to the companion processor.
  * 
  * Returns a negative number on error, zero on success.
  */
-static inline int do_peripherald_login() {
+/*static inline int do_peripherald_login() {
 
   // Sending an enter key opens the terminal for login
   pi_serial->write('\n');
@@ -156,7 +211,7 @@ static inline int do_peripherald_login() {
   }
 
   return 0;
-}
+}*/
 
 static void peripherald_run_command(const char* command, long print_wait_time = 0) {
   delay(10);
@@ -173,6 +228,7 @@ static void peripherald_run_command(const char* command, long print_wait_time = 
     while (print_wait_time < millis()) {
       if (pi_serial->available()) {
         char c = pi_serial->available();
+        Serial.write(c);
         if (c == '\n' || c == '\r') {
           pi_serial->write(buffer, i);
           i = 0;
@@ -184,6 +240,9 @@ static void peripherald_run_command(const char* command, long print_wait_time = 
           buffer[i++] = c;
       }
     }
+  } else {
+    delay(30);
+    while (pi_serial->available()) pi_serial->read();
   }
 
   delay(10);
@@ -251,7 +310,7 @@ void peripherald_send_updates_to_companion() {
         pi_serial->write(y & 255);
         pi_serial->write(z >> 8);
         pi_serial->write(z & 255);
-        debug("%i: %i, %i, %i\n", i, x, y, z);
+        //debug("%i: %i, %i, %i\n", i, x, y, z);
       }
     }
 
@@ -277,31 +336,23 @@ void peripherald(void* arg) {
     // 256 elements per sector, 2 bytes per element = 512 bytes per sector
     peripherald_num_vram_sectors = PERIPHERALD_VRAM_SIZE / 512;
   }
-
-  while (pi_serial->available())
-    pi_serial->read();
+  debug("Have %i VRAM sectors available.\n", peripherald_num_vram_sectors);
 
   display_bootup_screen();
 
-  /*peripherald_wait_companion_boot();
-
-  if (do_peripherald_login() != 0) {
-    debug("Login failure: Exiting peripheral.d\n");
+  if (peripherald_wait_companion_boot() != 0) {
+    debug("Startup failure: Exiting peripheral.d\n");
     return;
-  }*/
+  }
 
   // Say that we stopped loading
-  /*_is_peripherald_loading = false;
+  _is_peripherald_loading = false;
   builtin_display->clearScreen(0x0000);
   builtin_display->println("Starting UI...");
 
   // Start the main program
   peripherald_run_command("cd ~/firmware/");
-  peripherald_run_command("python3 main.py");*/
-
-  // Wait until we get something, say we're loading until then
-  while (!pi_serial->available());
-  _is_peripherald_loading = false;
+  peripherald_run_command("python3 main.py");
 
   // Here we would start the peripheral protocol handling stuff
   int i = 0;
@@ -319,7 +370,8 @@ void peripherald(void* arg) {
     while (pi_serial->available()) {
       char c = pi_serial->read();
       _peripherald_serial_buffer[i++] = c;
-      debug("Got 0x%02hhx\n", c);
+      //debug("Got 0x%02hhx\n", c);
+      //Serial.flush();
     }
 
     // Process input
@@ -361,6 +413,8 @@ int process_gpu_commands(const char* src, int len) {
   int i = 0;
   while (len > i) {
     char command = src[i];
+    //Serial.printf("Command: %hhi\n", command);
+    //Serial.flush();
 
     if (command == CMD_REQUEST_ACKNOWLEDGE) {
       i++;
@@ -432,6 +486,8 @@ int process_gpu_commands(const char* src, int len) {
 
       builtin_display->fillRect(x1, y1, x2, y2, c);
 
+      Serial.printf("FillRect (%hu, %hu) ... (%hu, %hu) <- %.4hx\n", x1, y1, x2, y2, c);
+
     } else if (command == CMD_DRAW_RECT) {
       if (len - i < 11)
         break;
@@ -471,27 +527,37 @@ int process_gpu_commands(const char* src, int len) {
         break;
 
       i++;
-      uint8_t ih = (uint8_t)src[i];
+      uint8_t ih = (uint8_t)src[i++];
       uint8_t il = (uint8_t)src[i++];
-      size_t index = ((ih << 16) | (il << 8));
+      size_t index = (((uint32_t)ih << 16) | ((uint32_t)il << 8));
 
-      if (index >= peripherald_num_vram_sectors) {
+      Serial.printf("WR VRAM: %hhu %hhu index=%lu\n", il, ih, index);
+      //Serial.flush();
+
+      if (index >= (peripherald_num_vram_sectors << 8)) {
         i += 512;
         continue;
       }
 
-      for (char j = 0; j < 256; j++) {
+      //Serial.println("Writing...");
+      //Serial.flush();
+
+      for (int j = 0; j < 256; j++) {
         char high = src[i++];
         char low = src[i++];
         vram[j + index] = ((high << 8) | low);
+        //Serial.printf("wr %lu <- %hu\n", j + index, (high << 8) | low);
+        //Serial.flush();
       }
+      //Serial.println("Wrote the VRAM");
+      //Serial.flush();
 
     } else if (command == CMD_RENDER_BITMAP) {
       if (len - i < 9)
         break;
 
       i++;
-      uint8_t ih = (uint8_t)src[i];
+      uint8_t ih = (uint8_t)src[i++];
       uint8_t il = (uint8_t)src[i++];
       char xh = src[i++];
       char xl = src[i++];
@@ -504,11 +570,13 @@ int process_gpu_commands(const char* src, int len) {
       uint16_t y = (yh << 8) | yl;
       size_t index = ((ih << 16) | (il << 8));
 
-      if (index >= peripherald_num_vram_sectors) {
+      if (index >= (peripherald_num_vram_sectors << 8)) {
         continue;
       }
 
       builtin_display->drawBitmap16(x, y, xs, ys, &(vram[index]));
+
+      Serial.printf("RenderBitmap (%hu, %hu) sz=[%hu, %hu] @%lu\n", x, y, xs, ys, index);
 
     } else if (command == CMD_SELECT_DISPLAY) {
       if (len - i < 2)
@@ -523,27 +591,29 @@ int process_gpu_commands(const char* src, int len) {
         break;
 
       i++;
-      uint8_t ih = (uint8_t)src[i];
-      uint8_t il = (uint8_t)src[i++];
-      char xh = src[i++];
-      char xl = src[i++];
-      char yh = src[i++];
-      char yl = src[i++];
+      uint32_t ih = (uint32_t)src[i++];
+      uint32_t il = (uint32_t)src[i++];
+      uint8_t xh = (uint8_t)src[i++];
+      uint8_t xl = (uint8_t)src[i++];
+      uint8_t yh = (uint8_t)src[i++];
+      uint8_t yl = (uint8_t)src[i++];
       uint8_t xs = (uint8_t)src[i++];
       uint8_t ys = (uint8_t)src[i++];
       uint8_t palette_size = (uint8_t)src[i++];
 
-      uint16_t x = (xh << 8) | xl;
-      uint16_t y = (yh << 8) | yl;
+      uint16_t x = ((uint16_t)xh << 8) | xl;
+      uint16_t y = ((uint16_t)yh << 8) | yl;
       size_t index = ((ih << 16) | (il << 8));
 
-      if (index >= peripherald_num_vram_sectors) {
+      if (index >= (peripherald_num_vram_sectors << 8)) {
         continue;
       }
 
       uint16_t* color_palette = &(vram[index]);
       uint16_t* image_data = &(vram[index + palette_size]);
       drawPaletteImage16(x, y, xs, ys, color_palette, image_data);
+      
+      Serial.printf("RenderPaletteImage (%hu, %hu) sz=[%hu, %hu] @%lu\n", x, y, xs, ys, index);
 
     } else if (command == CMD_FILL_DISPLAY) {
       if (len - i < 3)
