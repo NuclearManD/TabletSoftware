@@ -3,6 +3,8 @@ from PIL import Image
 import time
 
 from ui import *
+from utils.protocol import TabletInterface
+
 
 class Application:
     def __init__(self, name, icon, color, main_f):
@@ -29,7 +31,7 @@ class SystemShell:
 
     def drawHome(self, display):
         # Draw background
-        #display.fillScreen(0x202020)
+        # display.fillScreen(0x202020)
         display.fillScreen(0)
 
         # Draw each app icon
@@ -47,7 +49,7 @@ class SystemShell:
             display.setCursor(x, y + self.APP_SIZE + 1)
             display.writeText(app.name)
 
-    def mainloop(self, tablet):
+    def mainloop(self, tablet: TabletInterface):
         display = tablet.getDisplay()
         self.drawHome(display)
         while True:

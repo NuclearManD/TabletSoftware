@@ -1,8 +1,12 @@
 
+
 from utils import platform, stdio_stream, protocol, compression
 import shell
+from application.library import *
 import time
 from ui import *
+
+from PIL import Image
 
 is_real_tablet = platform.is_real_tablet()
 
@@ -25,8 +29,6 @@ tablet = protocol.TabletInterface(stream)
 display = tablet.getDisplay()
 
 #display.fillScreen(0x202020)
-
-from PIL import Image
 
 sys = shell.SystemShell([
     shell.Application("Paint", None, 0x882297, None),
