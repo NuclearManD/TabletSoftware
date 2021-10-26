@@ -325,6 +325,11 @@ void peripherald_send_updates_to_companion() {
 void peripherald(void* arg) {
   debug("Starting peripheral.d\n");
 
+  // If we don't do this, the CPU will rest at 24Mhz, then when bytes come in we'll be too
+  // slow to process all of them in time.  THEN the OS will catch up and raise the clock
+  // speed XD
+  //set_min_cpu_hz(100000000);
+
   vram = (uint16_t*)malloc(PERIPHERALD_VRAM_SIZE);
   if (vram == nullptr) {
     debug("WARNING: Failed to allocate %i bytes for VRAM.  Allocating 32K instead.\n", PERIPHERALD_VRAM_SIZE);
@@ -348,10 +353,19 @@ void peripherald(void* arg) {
   // Say that we stopped loading
   _is_peripherald_loading = false;
   builtin_display->clearScreen(0x0000);
-  builtin_display->println("Starting UI...");
+
+  // Set up execution environment
+  peripherald_run_command("cd ~/TabletSoftware/src");
+  peripherald_run_command("stty -echo");
+
+  // Update if requested
+  if (read_user_button()) {
+    builtin_display->println("Power button held, updating...");
+    peripherald_run_command("git pull");
+  }
 
   // Start the main program
-  peripherald_run_command("cd ~/firmware/");
+  builtin_display->println("Starting UI...");
   peripherald_run_command("python3 main.py");
 
   // Here we would start the peripheral protocol handling stuff
@@ -370,9 +384,11 @@ void peripherald(void* arg) {
     while (pi_serial->available()) {
       char c = pi_serial->read();
       _peripherald_serial_buffer[i++] = c;
+      Serial.printf("%.02hhx ", c);
       //debug("Got 0x%02hhx\n", c);
       //Serial.flush();
     }
+    Serial.println();
 
     // Process input
     int bytes_used = process_gpu_commands(_peripherald_serial_buffer, i);
@@ -630,6 +646,8 @@ int process_gpu_commands(const char* src, int len) {
       // INVALID COMMAND BYTE
       i++;
     }
+
+    Serial.printf("Processed command: %hhx\n", command);
   }
 
   return i;
