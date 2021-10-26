@@ -1,9 +1,12 @@
-
+import math
 import time
 import traceback
 from typing import List
 
+from PIL.Image import Image
+
 from utils.protocol import TabletInterface, TabletDisplay
+from utils.stringutil import splitlines
 
 
 class PopupBox:
@@ -216,7 +219,7 @@ class TextButtonElement(UIElement):
 
     def onPress(self, x, y):
         # Don't process the event if it's not in this button
-        if x < self.x or y < self.y or x > self.x + self.width or y > self.y + self.width:
+        if x < self.x or y < self.y or x > self.x + self.width or y > self.y + self.height:
             return
 
         if self.pressColor is not None and self.display is not None:
@@ -227,7 +230,7 @@ class TextButtonElement(UIElement):
 
     def onRelease(self, x, y):
         # Don't process the event if it's not in this button
-        if x < self.x or y < self.y or x > self.x + self.width or y > self.y + self.width:
+        if x < self.x or y < self.y or x > self.x + self.width or y > self.y + self.height:
             return
 
         if self.pressColor is not None and self.display is not None:
@@ -235,10 +238,11 @@ class TextButtonElement(UIElement):
 
     def onClick(self, x, y):
         # Don't process the event if it's not in this button
-        if x < self.x or y < self.y or x > self.x + self.width or y > self.y + self.width:
+        if x < self.x or y < self.y or x > self.x + self.width or y > self.y + self.height:
             return
 
-        self.cb(self)
+        if self.cb is not None:
+            self.cb(self)
 
     def render(self, display: TabletDisplay, x, y):
         """x and y arguments are the location of the upper-left corner of the window"""
@@ -248,3 +252,49 @@ class TextButtonElement(UIElement):
         display.setCursor(self.x + self.xPad, self.y + self.yPad)
         display.setTextColor(self.textColor)
         display.writeText(self.text)
+
+
+class IconButtonElement(UIElement):
+    TEXT_X_PAD = 2
+    TEXT_Y_PAD = 2
+
+    def __init__(self, x, y, icon: Image, text: str, callback = None,
+                 display: TabletDisplay = None,
+                 textColor=0xFFFFFF):
+        """x and y arguments are the location of the element"""
+        super().__init__(x, y)
+        self.width = icon.width
+        self.height = icon.height
+        self.display = display
+        self.textColor = textColor
+        self.cb = callback
+        self.icon = icon
+
+        text = text.strip()
+
+        # Now we need to intelligently split the characters.
+        num_chars_per_line = math.floor((self.width - self.TEXT_X_PAD*2) / 8)
+        self.text = splitlines(text, ' ', num_chars_per_line)
+
+        self.height += 12 * len(self.text)
+
+    def onClick(self, x, y):
+        # Don't process the event if it's not in this button
+        if x < self.x or y < self.y or x > self.x + self.width or y > self.y + self.height:
+            return
+
+        if self.cb is not None:
+            self.cb(self)
+
+    def render(self, display: TabletDisplay, x, y):
+        """x and y arguments are the location of the upper-left corner of the window"""
+        self.display = display
+        x += self.x
+        y += self.y
+
+        display.drawImage(x, y, self.icon)
+        for i in range(len(self.text)):
+            line = self.text[i]
+            display.setCursor(x + self.TEXT_X_PAD, y + self.height + self.TEXT_Y_PAD + i*12)
+            display.setTextColor(self.textColor)
+            display.writeText(line)

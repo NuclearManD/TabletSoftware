@@ -1,0 +1,13 @@
+{
+  "name": "Industrial Processes",
+  "chapters": {
+    "Reacting": {
+      "Making Sodium Carbonate from Bicarbonate": "reacting/na2co3_from_nahco3.md"
+    },
+    "Refining": {
+      "Uranium": {
+        "Acid, Carbonate, Lye Route": "refining/uranium/acid_carbonate_lye.md"
+      }
+    }
+  }
+}
