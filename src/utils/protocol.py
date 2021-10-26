@@ -198,8 +198,8 @@ class TabletDisplay:
         self.vram_cache = VRAMCache(1024)
 
     def setTextColor(self, rgb):
-        color = rgb_to_u16(rgb)
-        self.iface._sendBytes(COMMAND_DRAW_BITMAP)
+        c = rgb_to_u16(rgb)
+        self.iface._sendBytes(COMMAND_SET_TEXT_COLOR, c >> 8, c & 255)
 
     def drawPixel(self, x, y, rgb):
         c = rgb_to_u16(rgb)
