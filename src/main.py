@@ -31,7 +31,6 @@ display = tablet.getDisplay()
 #display.fillScreen(0x202020)
 
 sys = shell.SystemShell([
-    shell.Application("Paint", None, 0x882297, None),
     LibraryApp()
 ])
 
