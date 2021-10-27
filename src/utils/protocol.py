@@ -40,9 +40,10 @@ class TabletInterface:
         self.lastBatteryCurrent = None
         self.presses = []
         self._input_buffer = b''
+        self.display = TabletDisplay(self)
 
     def getDisplay(self, index = 0):
-        return TabletDisplay(self)
+        return self.display
 
     def getBatteryVoltage(self):
         self._update()
@@ -131,7 +132,9 @@ class VRAMCache:
         self.total_sectors = total_sectors
 
     def getSectorOf(self, value):
+        print(self, 'Search', value)
         for i in self.items:
+            print(i.value)
             if i.value == value:
                 i.num_accesses += 1
                 return i.first_sector
@@ -188,7 +191,6 @@ class VRAMCache:
     def getBestChunk(self, size):
         # TODO: Implement this
         return 0
-        
 
 
 class TabletDisplay:
