@@ -1,8 +1,9 @@
+import traceback
 
 from PIL import Image
 import time
 
-from ui import *
+from ui import ErrorPopupBox
 from utils.protocol import TabletInterface
 
 
@@ -69,6 +70,7 @@ class SystemShell:
                     self.drawHome(display)
                     popup = ErrorPopupBox(str(e))
                     popup.mainloop(tablet)
+                    # traceback.print_exc()
 
                 # Re-render the homescreen
                 self.drawHome(display)

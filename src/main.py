@@ -32,7 +32,7 @@ display = tablet.getDisplay()
 
 sys = shell.SystemShell([
     shell.Application("Paint", None, 0x882297, None),
-    shell.Application("Library", Image.open("../res/library_icon.png"), 0x101070, None)
+    LibraryApp()
 ])
 
 sys.loadImages(display)

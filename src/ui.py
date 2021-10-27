@@ -188,14 +188,11 @@ class ApplicationWindow:
 
                     # What do we do with multitouch?
 
-        print('Goodbye!')
-
     def stopMainLoop(self):
         """
         You can easily use this as the callback for a button, as long as you don't have cleanup to do before
         your application exits.
         """
-        print('Stopping app.')
         self.keepRunningMainLoop = False
 
 
@@ -298,3 +295,19 @@ class IconButtonElement(UIElement):
             display.setCursor(x + self.TEXT_X_PAD, y + self.height + self.TEXT_Y_PAD + i*12)
             display.setTextColor(self.textColor)
             display.writeText(line)
+
+
+class MarkdownElement(UIElement):
+    def __init__(self, x, y, w, h, markdown):
+        super().__init__(x, y)
+        self.width = w
+        self.height = h
+        self.markdown = markdown
+
+    def render(self, display: TabletDisplay, x, y):
+        x += self.x
+        y += self.y
+        display.setCursor(x, y)
+        display.setTextColor(0xE0E0E0)
+
+        display.writeText(self.markdown)
