@@ -132,9 +132,7 @@ class VRAMCache:
         self.total_sectors = total_sectors
 
     def getSectorOf(self, value):
-        print(self, 'Search', value)
         for i in self.items:
-            print(i.value)
             if i.value == value:
                 i.num_accesses += 1
                 return i.first_sector
