@@ -2,13 +2,12 @@
   "name": "Mining & Geology",
   "chapters": {
     "Minerals": {
+      "Metals and Metal Ores": {
+        "Aluminum": "metals/aluminum.md",
+        "Aluminum Ores": "ores/aluminum.md"
+      },
       "Radioactive": {
         "Uraninite": "radioactive/uraninite.md"
-      }
-    },
-    "Refining": {
-      "Uranium": {
-        "Acid, Carbonate, Lye Route": "refining/uranium/acid_carbonate_lye.md"
       }
     }
   }
