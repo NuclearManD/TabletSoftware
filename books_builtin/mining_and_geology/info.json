@@ -1,0 +1,15 @@
+{
+  "name": "Mining & Geology",
+  "chapters": {
+    "Minerals": {
+      "Radioactive": {
+        "Uraninite": "radioactive/uraninite.md"
+      }
+    },
+    "Refining": {
+      "Uranium": {
+        "Acid, Carbonate, Lye Route": "refining/uranium/acid_carbonate_lye.md"
+      }
+    }
+  }
+}

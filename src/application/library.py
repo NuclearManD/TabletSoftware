@@ -48,7 +48,7 @@ def bookMiniApp(tablet: TabletInterface, root:str, chapters: dict):
                 window.render(display)
         else:
             continue
-        elements.append(TextButtonElement(30, 40 + i*20, 280, 15, k, 0x202020, callback))
+        elements.append(TextButtonElement(30, 40 + i*20, 480, 15, k, 0x202020, callback))
         i += 1
 
     window = ApplicationWindow(elements)
@@ -66,7 +66,7 @@ def pageMiniApp(tablet: TabletInterface, path: str):
     display.fillScreen(0)
     elements = [
         TextButtonElement(20, 20, 100, 20, "<- Back", 0x808080, callback=back_function, pressColor=0x606060),
-        MarkdownElement(10, 30, 310, 280, markdown)
+        MarkdownElement(10, 30, 780, 440, markdown, os.path.dirname(path))
     ]
 
     window = ApplicationWindow(elements)
@@ -92,7 +92,7 @@ class LibraryApp(Application):
                 bookMiniApp(tablet, books[i].path, books[i].chapters)
                 display.fillScreen(0)
                 self.window.render(display)
-            elements.append(books[i].getIconAsElement(5 + i * 74, 50, callback))
+            elements.append(books[i].getIconAsElement(5 + i * 80, 50, callback))
 
         self.window = ApplicationWindow(elements)
         self.window.mainloop(tablet)

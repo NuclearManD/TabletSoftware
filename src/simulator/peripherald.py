@@ -77,6 +77,8 @@ class PeripheraldEmulator:
         # add to window and show
         self.root.mainloop()
 
+        quit(0)
+
     def setPixel(self, x, y, color):
         if type(color) == str:
             rgb_str = color

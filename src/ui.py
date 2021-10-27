@@ -1,12 +1,14 @@
 import math
+import os
 import time
 import traceback
 from typing import List
 
-from PIL.Image import Image
+from PIL import Image
 
 from utils.protocol import TabletInterface, TabletDisplay
 from utils.stringutil import splitlines
+from utils.parsemd import parseMarkdown, MarkdownParagraphElement, MarkdownImageElement, MarkdownHeaderElement
 
 
 class PopupBox:
@@ -255,7 +257,7 @@ class IconButtonElement(UIElement):
     TEXT_X_PAD = 2
     TEXT_Y_PAD = 2
 
-    def __init__(self, x, y, icon: Image, text: str, callback = None,
+    def __init__(self, x, y, icon: Image.Image, text: str, callback = None,
                  display: TabletDisplay = None,
                  textColor=0xFFFFFF):
         """x and y arguments are the location of the element"""
@@ -298,16 +300,37 @@ class IconButtonElement(UIElement):
 
 
 class MarkdownElement(UIElement):
-    def __init__(self, x, y, w, h, markdown):
+    def __init__(self, x, y, w, h, markdown, root='.'):
         super().__init__(x, y)
         self.width = w
         self.height = h
-        self.markdown = markdown
+        self.markdown_li = parseMarkdown(markdown)
+        self.root = root
 
     def render(self, display: TabletDisplay, x, y):
         x += self.x
-        y += self.y
-        display.setCursor(x, y)
-        display.setTextColor(0xE0E0E0)
+        y += self.y + 16
 
-        display.writeText(self.markdown)
+        for i in self.markdown_li:
+            if isinstance(i, MarkdownHeaderElement):
+                display.setCursor(x + 2 * i.tier, y)
+                display.setTextColor(0xE0FFFF)
+                display.writeText(i.text)
+                y += 20
+            elif isinstance(i, MarkdownImageElement):
+                try:
+                    image = Image.open(os.path.join(self.root, i.path))
+                    display.drawImage(x, y, image)
+                    y += 5 + image.height
+                except FileNotFoundError:
+                    display.setCursor(x + 8, y)
+                    display.setTextColor(0x1010FF)
+                    display.writeText('Image of ' + i.desc)
+                    y += 16
+            elif isinstance(i, MarkdownParagraphElement):
+                display.setTextColor(0xD0D0D0)
+                for line in splitlines(i.text, ' ', math.floor(self.width / 8) - 4):
+                    display.setCursor(x + 32, y)
+                    display.writeText(line)
+                    y += 12
+                y += 4
