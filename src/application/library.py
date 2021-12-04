@@ -88,7 +88,7 @@ class LibraryApp(Application):
             TextButtonElement(20, 20, 100, 20, "<- Exit", 0x808080, callback=self.exitcb, pressColor=0x606060)
         ]
         for i in range(len(books)):
-            def callback(x):
+            def callback(x, i=i):
                 bookMiniApp(tablet, books[i].path, books[i].chapters)
                 display.fillScreen(0)
                 self.window.render(display)
