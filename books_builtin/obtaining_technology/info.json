@@ -1,0 +1,11 @@
+{
+  "name": "Obtaining Technology",
+  "chapters": {
+    "For Those Unable to Scavenge": {
+    },
+    "Early Electricity Production": {
+      "Earth Cells": "elec_prod_0/earth_cell.md",
+      "Cheap Solar": "elec_prod_0/copper_salt_solar.md"
+    }
+  }
+}

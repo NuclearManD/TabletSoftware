@@ -18,6 +18,40 @@ steps of the Bayer process.
 
 ## Corundum
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ![Corundum](corundum.png)
 
 Corundum is Aluminum Oxide (Al2O3), so it should be possible to dissolve
